@@ -1,0 +1,166 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+import type { Express, NextFunction, Request, Response } from "express";
+import twilio from "twilio";
+import { callStateSchema, type CallState, type ConversationMessage } from "@shared/schema";
+import { updateCallState } from "@shared/call-logic";
+import { generateAssistantReply } from "./assistant";
+import { synthesizeFishBuffer } from "./fish";
+import { recordCompletedCall } from "./records";
+
+type PhoneSession = {
+  state: CallState;
+  history: ConversationMessage[];
+  updatedAt: number;
+};
+
+const sessions = new Map<string, PhoneSession>();
+const dataDirectory = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "data"));
+const audioDirectory = path.join(dataDirectory, "telephony-audio");
+
+function publicBaseUrl() {
+  return (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+}
+
+function signedRequestUrl(req: Request) {
+  const configured = publicBaseUrl();
+  if (configured) return `${configured}${req.originalUrl}`;
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+  return `${forwardedProto || req.protocol}://${forwardedHost || req.get("host")}${req.originalUrl}`;
+}
+
+export function validateTwilioWebhook(req: Request, res: Response, next: NextFunction) {
+  if (process.env.TWILIO_SKIP_SIGNATURE === "true" && process.env.NODE_ENV !== "production") {
+    return next();
+  }
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const signature = req.get("x-twilio-signature");
+  if (!token || !signature) return res.status(401).send("Twilio imzası gerekli.");
+  const valid = twilio.validateRequest(token, signature, signedRequestUrl(req), req.body || {});
+  if (!valid) return res.status(403).send("Geçersiz Twilio imzası.");
+  return next();
+}
+
+export function createGatherResponse(prompt: string, audioUrl?: string | null) {
+  const response = new twilio.twiml.VoiceResponse();
+  const gather = response.gather({
+    input: ["speech"],
+    action: "/api/telephony/turn",
+    method: "POST",
+    language: "tr-TR",
+    speechTimeout: "auto",
+    actionOnEmptyResult: true,
+  });
+  if (audioUrl) gather.play(audioUrl);
+  else gather.say({ language: "tr-TR" }, prompt);
+  response.redirect({ method: "POST" }, "/api/telephony/incoming");
+  return response.toString();
+}
+
+async function createPhoneAudio(text: string) {
+  if (!process.env.FISH_AUDIO_API_KEY || !publicBaseUrl()) return null;
+  await mkdir(audioDirectory, { recursive: true, mode: 0o700 });
+  const id = randomUUID();
+  const filePath = path.join(audioDirectory, `${id}.mp3`);
+  await writeFile(filePath, await synthesizeFishBuffer(text, { phoneOptimized: true }), { mode: 0o600 });
+  const timer = setTimeout(() => void unlink(filePath).catch(() => undefined), 60 * 60 * 1000);
+  timer.unref();
+  return `${publicBaseUrl()}/api/telephony/audio/${id}`;
+}
+
+function getSession(callSid: string) {
+  const existing = sessions.get(callSid);
+  if (existing) return existing;
+  const session: PhoneSession = {
+    state: callStateSchema.parse({}),
+    history: [{ role: "assistant", content: "Merhaba, ben Arama. Size nasıl yardımcı olabilirim?" }],
+    updatedAt: Date.now(),
+  };
+  sessions.set(callSid, session);
+  return session;
+}
+
+function cleanOldSessions() {
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+  for (const [callSid, session] of sessions) {
+    if (session.updatedAt < cutoff) sessions.delete(callSid);
+  }
+}
+
+export function registerTelephonyRoutes(app: Express) {
+  app.get("/api/telephony/audio/:id", async (req, res, next) => {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.sendStatus(404);
+    try {
+      const audio = await readFile(path.join(audioDirectory, `${req.params.id}.mp3`));
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "private, max-age=600");
+      return res.send(audio);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return res.sendStatus(404);
+      return next(error);
+    }
+  });
+
+  app.post("/api/telephony/incoming", validateTwilioWebhook, async (req, res, next) => {
+    try {
+      cleanOldSessions();
+      const callSid = String(req.body.CallSid || randomUUID());
+      getSession(callSid);
+      const prompt = "Merhaba, ben Arama. Bu görüşme talebinizi yanıtlamak ve kayıt oluşturmak için yapay zekâ servisleriyle işlenir. Randevu, fiyat veya destek konusunda size nasıl yardımcı olabilirim?";
+      const audioUrl = await createPhoneAudio(prompt);
+      return res.type("text/xml").send(createGatherResponse(prompt, audioUrl));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post("/api/telephony/turn", validateTwilioWebhook, async (req, res, next) => {
+    try {
+      const callSid = String(req.body.CallSid || randomUUID());
+      const transcript = String(req.body.SpeechResult || "").trim().slice(0, 4000);
+      const session = getSession(callSid);
+      session.updatedAt = Date.now();
+
+      if (!transcript) {
+        const prompt = "Sizi duyamadım. Talebinizi tekrar söyler misiniz?";
+        const audioUrl = await createPhoneAudio(prompt);
+        return res.type("text/xml").send(createGatherResponse(prompt, audioUrl));
+      }
+
+      const previousState = session.state;
+      const state = updateCallState(transcript, previousState);
+      const reply = await generateAssistantReply(transcript, session.history, state);
+      session.state = state;
+      session.history = ([
+        ...session.history,
+        { role: "user" as const, content: transcript },
+        { role: "assistant" as const, content: reply },
+      ]).slice(-20);
+
+      if (state.completed && !previousState.completed) {
+        await recordCompletedCall({
+          callId: callSid,
+          source: "twilio",
+          state,
+          transcript,
+          history: session.history,
+        });
+      }
+
+      const audioUrl = await createPhoneAudio(reply);
+      if (state.completed) {
+        const response = new twilio.twiml.VoiceResponse();
+        if (audioUrl) response.play(audioUrl);
+        else response.say({ language: "tr-TR" }, reply);
+        response.hangup();
+        sessions.delete(callSid);
+        return res.type("text/xml").send(response.toString());
+      }
+      return res.type("text/xml").send(createGatherResponse(reply, audioUrl));
+    } catch (error) {
+      return next(error);
+    }
+  });
+}

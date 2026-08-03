@@ -1,0 +1,46 @@
+{
+  "name": "voice-agent-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "dev": "tsx server/index.ts",
+    "check": "tsc --noEmit",
+    "build": "tsx script/build.ts",
+    "start": "node dist/index.cjs",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "smoke:http": "node script/http-smoke.mjs",
+    "smoke:live": "node script/live-smoke.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.6.1",
+    "fish-audio": "^0.1.0",
+    "helmet": "^8.3.0",
+    "lucide-react": "^0.468.0",
+    "multer": "^2.0.2",
+    "nanoid": "^5.1.5",
+    "openai": "^6.7.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "twilio": "^6.0.2",
+    "vite": "^7.1.7",
+    "wouter": "^3.10.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.5.2",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "esbuild": "^0.25.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2"
+  }
+}
