@@ -126,7 +126,7 @@ Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
 - Optional encrypted JSONL records, admin list/delete endpoints, and retention pruning
 - Server-side active-voice metering, protected monthly reports, and configurable hard quota enforcement
 - Twilio request signature verification in production
-- Docker multi-stage build running as a non-root user
+- Docker multi-stage build that fixes the dedicated volume mount, then runs the application process as the non-root `node` user
 - Provider timeouts, cancellation propagation, and local fallback paths
 
 See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY.md`](SECURITY.md) for private vulnerability reporting, and [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for runtime modes, incidents, and rollback boundaries.

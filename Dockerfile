@@ -13,8 +13,9 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /app/data && chown -R node:node /app
-USER node
 EXPOSE 5177
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5177)+'/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-CMD ["node", "dist/index.cjs"]
+# Railway volumes are mounted after image build and can arrive root-owned. Fix only
+# the dedicated data mount, then drop privileges before starting the application.
+CMD ["sh", "-c", "chown -R node:node /app/data && exec runuser -u node -- node dist/index.cjs"]

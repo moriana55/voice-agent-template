@@ -13,6 +13,7 @@ This runbook covers the repository’s current deployment contract. Platform-spe
 - Protected usage report: `GET /api/admin/usage?period=YYYY-MM`
 - Persistent data: `DATA_DIR/call-records.jsonl` when `RECORD_STORAGE` is enabled
 - Railway volume mount: `/app/data` with `DATA_DIR=/app/data`
+- Container startup normalizes ownership only on `/app/data`, then drops to the unprivileged `node` user before starting the service.
 
 ## Runtime modes
 
