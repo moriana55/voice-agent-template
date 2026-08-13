@@ -1,5 +1,7 @@
 # VoiceOps Studio portfolio case study
 
+**Live demo:** https://voiceops-studio-production.up.railway.app/#/present
+
 ## Positioning
 
 VoiceOps Studio demonstrates how a multilingual customer-call workflow can preserve language context, structured state, live speech, privacy boundaries, and provider fallback across both browser and telephone channels.

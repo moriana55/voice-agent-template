@@ -20,6 +20,8 @@ verification:
   interactive_locale_scenario: french_appointment_passed
   invalid_provider_credentials: graceful_local_fallback_passed
   fish_tts_live: passed_real_mp3_2026-08-13
+  railway_deployment: live_health_checked_2026-08-14
+  railway_fish_first_audio_ms: 1461
   provider_status: runtime_health_verified
   dependency_audit: 0_known_vulnerabilities_2026-08-13
 release:

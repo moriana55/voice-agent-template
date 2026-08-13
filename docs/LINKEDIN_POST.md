@@ -19,6 +19,7 @@ The part I care about most is degradation behavior: when the model provider is u
 I’m sharing the engineering evidence and current limitations openly because reliable AI products are built around boundaries and failure modes, not only the happy-path demo.
 
 Repository: https://github.com/moriana55/voiceops-studio
+Live demo: https://voiceops-studio-production.up.railway.app/#/present
 
 #VoiceAI #AIEngineering #TypeScript #React #NodeJS #OpenSource #DevTools
 

@@ -2,6 +2,8 @@
 
 VoiceOps Studio is a portfolio-grade voice-agent prototype for service businesses. It captures a customer request, extracts structured intent and missing details, speaks a response, and can persist a consent-aware call record across ten languages.
 
+**[Open the live demo](https://voiceops-studio-production.up.railway.app/#/present)** · [Read the case study](docs/CASE_STUDY.md)
+
 ![VoiceOps Studio voice operations console](docs/assets/voiceops-studio-console.jpg)
 
 ## What it demonstrates
@@ -20,7 +22,7 @@ VoiceOps Studio is a portfolio-grade voice-agent prototype for service businesse
 | --- | --- | --- |
 | Ten-language intent flow | Shared locale contract plus automated appointment extraction tests for all ten locales | Verified |
 | Fish Audio TTS | Real MP3 response reproduced locally with Fish Audio S2 Pro | Verified |
-| First audio | 1.02 s observed in one local presentation run on 2026-08-13; environment-dependent, not a benchmark | Observed |
+| First audio | 1.46 s observed in one Railway production smoke run on 2026-08-14; environment-dependent, not a benchmark | Observed |
 | Automated validation | `npm test` → 18 passing tests | Verified |
 | Production bundle | `npm run check` and `npm run build` pass on Node 22 | Verified |
 | HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns | Verified |
@@ -123,7 +125,7 @@ See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY
 
 ## Current status and limits
 
-VoiceOps Studio is an actively developed portfolio prototype, not a deployed production service. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single local run and does not claim an SLA.
+VoiceOps Studio has a public portfolio deployment, but it is not presented as a production-ready customer service. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single smoke run and does not claim an SLA.
 
 Fish Audio, Anthropic, OpenAI, and Twilio are third-party services. This repository is not affiliated with or endorsed by those providers.
 
