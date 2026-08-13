@@ -14,10 +14,16 @@ assert(live.status === 200, `live health ${live.status}`);
 const ready = await fetch(`${baseUrl}/api/health/ready`);
 assert([200, 503].includes(ready.status), `ready health ${ready.status}`);
 
+const product = await fetch(`${baseUrl}/api/product`).then((response) => response.json());
+assert(product.productName && product.agentName, "public product configuration missing");
+assert(product.plan?.billingBasis === "active-voice-seconds", "billing basis missing");
+
 const callId = crypto.randomUUID();
 const body = new FormData();
 body.set("callId", callId);
-body.set("consent", "true");
+body.set("turnId", crypto.randomUUID());
+body.set("noticeAcknowledged", "true");
+body.set("storageConsent", "true");
 body.set("locale", "tr");
 body.set("text", "Yarın saat 15:00 için randevu istiyorum, adım Ayşe Yılmaz, telefonum 0532 123 45 67");
 body.set("history", "[]");
@@ -45,6 +51,13 @@ const records = await fetch(`${baseUrl}/api/admin/records`, {
 const recordsPayload = await records.json();
 assert(records.status === 200, `admin records ${records.status}`);
 assert(recordsPayload.records?.some((record) => record.callId === callId), "saved call record missing");
+
+const usage = await fetch(`${baseUrl}/api/admin/usage`, {
+  headers: { authorization: `Bearer ${adminKey}` },
+});
+const usagePayload = await usage.json();
+assert(usage.status === 200, `admin usage ${usage.status}`);
+assert(usagePayload.turns >= 1, "usage meter did not record the web turn");
 
 const phoneCallSid = `CA-${crypto.randomUUID()}`;
 const incomingUrl = `${baseUrl}/api/telephony/incoming?locale=tr`;
@@ -115,5 +128,5 @@ assert(
 
 console.log(JSON.stringify({
   ok: true,
-  checks: ["live", "ready", "locale", "consent", "turn", "record", "admin-auth", "twilio-signature", "twiml", "phone-turns"],
+  checks: ["live", "ready", "product-config", "locale", "notice", "storage-consent", "turn", "record", "usage", "admin-auth", "twilio-signature", "twiml", "phone-turns"],
 }));

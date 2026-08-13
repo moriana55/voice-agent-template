@@ -33,6 +33,7 @@ jobs:
           DATA_ENCRYPTION_KEY: ci-only-smoke-encryption-key
           DATA_DIR: ${{ runner.temp }}/voiceops-smoke-data
           TWILIO_AUTH_TOKEN: smoke-twilio
+          TELEPHONY_RECORD_STORAGE: enabled
           PUBLIC_BASE_URL: ""
           ALLOWED_ORIGINS: http://127.0.0.1:5193
         run: |

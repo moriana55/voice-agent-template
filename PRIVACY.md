@@ -10,8 +10,9 @@ işletmeye özel KVKK/GDPR metni ve hukuki dayanak ayrıca doğrulanmalıdır.
 - Kullanıcı paylaşırsa isim, telefon ve randevu tercihi
 - Teknik istek bilgisi: zaman, endpoint, durum kodu, süre ve rastgele istek kimliği
 
-Ham ses kalıcı olarak saklanmaz. Tamamlanan talebin yapılandırılmış özeti ve son
-görüşme mesajları `DATA_DIR` altındaki çağrı kayıtlarına yazılır.
+Ham ses kalıcı olarak saklanmaz. Yalnızca kullanıcı ayrı kayıt iznini seçerse
+tamamlanan talebin yapılandırılmış özeti ve son görüşme mesajları `DATA_DIR`
+altındaki çağrı kayıtlarına yazılır.
 
 ## Koruma
 
@@ -20,9 +21,13 @@ görüşme mesajları `DATA_DIR` altındaki çağrı kayıtlarına yazılır.
 - API loglarına döküm, isim, telefon veya ses içeriği yazılmaz.
 - Yönetim kayıtları yalnızca `ADMIN_API_KEY` ile okunabilir veya silinebilir.
 - Varsayılan saklama süresi 30 gündür; `RECORD_RETENTION_DAYS` ile değiştirilebilir.
-- Tarayıcı, açık kabul olmadan görüşme isteği göndermez; sunucu da `consent=true`
-  olmayan web isteklerini reddeder.
+- Tarayıcı, veri işleme bilgilendirmesi kabul edilmeden görüşme isteği göndermez;
+  sunucu da `noticeAcknowledged=true` olmayan web isteklerini reddeder.
+- Kayıt/aktarım izni `storageConsent` ile bilgilendirme kabulünden ayrı tutulur.
 - Twilio karşılama mesajı görüşmenin yapay zekâ servisleriyle işleneceğini bildirir.
+  Telefon kaydı `TELEPHONY_RECORD_STORAGE=enabled` açıkça ayarlanana kadar kapalıdır.
+- Faturalama sayacı ham içerik yerine çağrının özetlenmiş aktif ses saniyesini ve
+  tek yönlü çağrı kimliği özetini saklar.
 
 ## Veri akışı
 

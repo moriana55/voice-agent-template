@@ -1,4 +1,5 @@
 import { localeMetadata, normalizeLocale, type Locale } from "@shared/i18n";
+import { agentName } from "./product";
 
 export const DEFAULT_LOCALE = normalizeLocale(process.env.AGENT_LANG, "en");
 
@@ -53,7 +54,7 @@ const welcomes: Record<Locale, string> = {
 };
 
 export function systemInstructions(locale: Locale) {
-  return instructions[locale];
+  return instructions[locale].replaceAll("Nova", agentName());
 }
 
 export function openingLeadIn(locale: Locale) {
@@ -61,7 +62,7 @@ export function openingLeadIn(locale: Locale) {
 }
 
 export function welcomeMessage(locale: Locale) {
-  return welcomes[locale];
+  return welcomes[locale].replaceAll("Nova", agentName());
 }
 
 const phoneDisclosures: Record<Locale, string> = {
@@ -86,7 +87,7 @@ const unheardMessages: Record<Locale, string> = {
 };
 
 export function phoneDisclosure(locale: Locale) {
-  return phoneDisclosures[locale];
+  return phoneDisclosures[locale].replaceAll("Nova", agentName());
 }
 
 export function unheardMessage(locale: Locale) {

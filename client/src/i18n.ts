@@ -53,8 +53,10 @@ const primaryCopy = {
     presentationHelp: "Choose a prepared scenario or speak live through your microphone.",
     interruptHelp: "Press the microphone to interrupt the current response.",
     idleHelp: "Press and speak; recording completes automatically after silence.",
-    consentStrong: "I understand and consent.",
-    consentText: "Audio and text are sent to configured AI services to generate a response; completed requests may be stored as a secure call record.",
+    consentStrong: "I have read the processing notice.",
+    consentText: "Audio and text are sent to configured AI services to generate a response.",
+    storageConsentStrong: "Save this request.",
+    storageConsentText: "I separately allow the completed request and contact details to be stored and forwarded to the business.",
     systemStatus: "SYSTEM STATUS",
     livePipeline: "Live pipeline",
     connections: "Connections",
@@ -150,8 +152,10 @@ const primaryCopy = {
     presentationHelp: "Hazır senaryoyu seçin veya mikrofondan canlı konuşun.",
     interruptHelp: "Mikrofona basarak yanıtı kesebilirsiniz.",
     idleHelp: "Basın ve konuşun; sessizlikte kayıt otomatik tamamlanır.",
-    consentStrong: "Bilgilendirildim ve kabul ediyorum.",
-    consentText: "Ses ve metin, yanıt üretmek için yapılandırılmış AI servislerine gönderilir; tamamlanan talep güvenli çağrı kaydına alınabilir.",
+    consentStrong: "Veri işleme bilgilendirmesini okudum.",
+    consentText: "Ses ve metin, yanıt üretmek için yapılandırılmış AI servislerine gönderilir.",
+    storageConsentStrong: "Talebimi kaydedin.",
+    storageConsentText: "Tamamlanan talebimin ve iletişim bilgilerimin ayrıca saklanmasına ve işletmeye aktarılmasına izin veriyorum.",
     systemStatus: "SİSTEM DURUMU",
     livePipeline: "Canlı zincir",
     connections: "Bağlantılar",
@@ -355,7 +359,7 @@ export const intentLabels: Record<Locale, Record<CallState["intent"], string>> =
   ru: { genel: "Общий запрос", randevu: "Запись", fiyat: "Цена", destek: "Поддержка" },
 };
 
-export function initialMessages(locale: Locale): Message[] {
+export function initialMessages(locale: Locale, agentName = "Nova"): Message[] {
   return [{
     role: "assistant",
     content: ({
@@ -364,7 +368,7 @@ export function initialMessages(locale: Locale): Message[] {
       fr: "Bonjour, ici Nova. Comment puis-je vous aider aujourd’hui ?", it: "Buongiorno, sono Nova. Come posso aiutarla oggi?",
       pt: "Olá, aqui é a Nova. Como posso ajudar hoje?", nl: "Hallo, u spreekt met Nova. Hoe kan ik u vandaag helpen?",
       pl: "Dzień dobry, tu Nova. W czym mogę dziś pomóc?", ru: "Здравствуйте, это Nova. Чем я могу помочь?",
-    } satisfies Record<Locale, string>)[locale],
+    } satisfies Record<Locale, string>)[locale].replaceAll("Nova", agentName),
   }];
 }
 

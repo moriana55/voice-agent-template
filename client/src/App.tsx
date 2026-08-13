@@ -3,7 +3,7 @@ import {
   Activity, ArrowRight, AudioLines, BadgeDollarSign, Bot, CalendarClock, Check,
   CircleStop, Download, Headphones, Mic, MonitorPlay, Moon,
   PhoneCall, Radio, RefreshCw, RotateCcw, Send, ShieldCheck, Sun, UserRound,
-  Waves, Wrench,
+  Waves, Wrench, BarChart3, LockKeyhole, Trash2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { CallState } from "@shared/schema";
@@ -26,17 +26,137 @@ type Status = {
   records: { enabled: boolean; encrypted: boolean; crmWebhook: boolean };
   localization?: { defaultLocale: Locale; supportedLocales: Locale[] };
 };
+type ProductConfig = {
+  productName: string;
+  agentName: string;
+  businessName: string;
+  tagline: string;
+  supportEmail: string | null;
+  privacyUrl: string;
+  portfolioAttribution: boolean;
+  plan: { name: string; includedMinutes: number; overageTryPerMinute: number; billingBasis: string };
+};
 type StreamEvent =
   | { type: "meta"; transcript: string; state: CallState; mode: string }
   | { type: "text_delta"; text: string }
   | { type: "audio"; audioBase64: string; audioMime: string }
-  | { type: "done"; reply: string; latencyMs: number; firstAudioMs: number | null; audioWarning: string | null; recorded: boolean }
+  | { type: "done"; reply: string; latencyMs: number; firstAudioMs: number | null; audioWarning: string | null; recorded: boolean; usageSeconds: number }
   | { type: "error"; message: string };
 type RunTurnContext = {
   history?: Message[];
   state?: CallState;
   scenario?: PresentationScenario;
 };
+type UsageSummary = {
+  period: string;
+  activeMinutes: number;
+  turns: number;
+  calls: number;
+  includedMinutes: number;
+  remainingIncludedMinutes: number;
+  overageMinutes: number;
+  overageTryPerMinute: number;
+  estimatedOverageTry: number;
+  hardLimitMinutes: number | null;
+  daily: Array<{ date: string; minutes: number; turns: number }>;
+};
+type AdminRecord = {
+  id: string;
+  createdAt: string;
+  intent: string;
+  name: string | null;
+  phone: string | null;
+  summary: string;
+  source: string;
+  locale: string;
+};
+
+function AdminDashboard({ product }: { product: ProductConfig }) {
+  const [key, setKey] = useState("");
+  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [records, setRecords] = useState<AdminRecord[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function loadDashboard(event?: FormEvent) {
+    event?.preventDefault();
+    if (!key.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const headers = { authorization: `Bearer ${key.trim()}` };
+      const [usageResponse, recordsResponse] = await Promise.all([
+        fetch(`/api/admin/usage?period=${encodeURIComponent(period)}`, { headers }),
+        fetch("/api/admin/records?limit=50", { headers }),
+      ]);
+      if (!usageResponse.ok || !recordsResponse.ok) throw new Error("Yönetim anahtarı geçersiz veya servis hazır değil.");
+      setUsage(await usageResponse.json());
+      setRecords((await recordsResponse.json()).records || []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Yönetim verisi alınamadı.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeRecord(id: string) {
+    const response = await fetch(`/api/admin/records/${id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${key.trim()}` },
+    });
+    if (response.ok) setRecords((current) => current.filter((record) => record.id !== id));
+    else setError("Kayıt silinemedi.");
+  }
+
+  return <main className="admin-shell">
+    <header className="admin-header">
+      <div><p className="eyebrow">MANAGED VOICE / OPERATIONS</p><h1>{product.businessName}</h1>
+        <p>{product.plan.name} · {product.plan.includedMinutes} dakika dahil · aşım {product.plan.overageTryPerMinute} TL/dk</p></div>
+      <Link href="/" className="admin-back">Canlı konsola dön</Link>
+    </header>
+    <form className="admin-login" onSubmit={loadDashboard}>
+      <LockKeyhole size={19} /><input type="password" value={key} onChange={(event) => setKey(event.target.value)}
+        placeholder="ADMIN_API_KEY" autoComplete="current-password" />
+      <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} />
+      <button type="submit" disabled={loading || !key.trim()}>{loading ? "Yükleniyor…" : "Raporu aç"}</button>
+    </form>
+    {error && <p className="error-message" role="alert">{error}</p>}
+    {usage && <>
+      <section className="admin-metrics" aria-label="Kullanım özeti">
+        <article><BarChart3 /><span>Aktif kullanım</span><strong>{usage.activeMinutes} dk</strong><small>{usage.remainingIncludedMinutes} dk paket kaldı</small></article>
+        <article><PhoneCall /><span>Görüşmeler</span><strong>{usage.calls}</strong><small>{usage.turns} konuşma turu</small></article>
+        <article><BadgeDollarSign /><span>Tahmini aşım</span><strong>{usage.estimatedOverageTry.toLocaleString("tr-TR")} TL</strong><small>{usage.overageMinutes} dk × {usage.overageTryPerMinute} TL</small></article>
+      </section>
+      <section className="admin-table-card">
+        <div className="panel-title"><div><p className="eyebrow">LEAD KAYITLARI</p><h2>Son tamamlanan talepler</h2></div><span>{records.length} kayıt</span></div>
+        <div className="admin-records">
+          {records.length === 0 ? <p>Bu dönemde izinli kayıt bulunmuyor.</p> : records.map((record) => <article key={record.id}>
+            <div><strong>{record.name || "İsimsiz müşteri"}</strong><small>{record.phone || "Telefon yok"} · {record.intent} · {record.locale.toUpperCase()}</small></div>
+            <p>{record.summary}</p><time>{new Date(record.createdAt).toLocaleString("tr-TR")}</time>
+            <button type="button" aria-label="Kaydı sil" onClick={() => void removeRecord(record.id)}><Trash2 size={16} /></button>
+          </article>)}
+        </div>
+      </section>
+    </>}
+  </main>;
+}
+
+function PrivacyPage({ product }: { product: ProductConfig }) {
+  return <main className="admin-shell privacy-page">
+    <header className="admin-header"><div><p className="eyebrow">PRIVACY / DATA FLOW</p>
+      <h1>Veri işleme bilgilendirmesi</h1><p>{product.businessName} · {product.productName}</p></div>
+      <Link href="/" className="admin-back">Uygulamaya dön</Link></header>
+    <section className="admin-table-card privacy-copy">
+      <h2>Hangi veriler işlenir?</h2><p>Gönderdiğiniz ses veya metin, yanıt üretmek amacıyla yapılandırılmış yapay zekâ servislerine iletilir. Ham ses kalıcı olarak saklanmaz.</p>
+      <h2>Talep kaydı isteğe bağlıdır</h2><p>Ayrı kayıt iznini seçerseniz tamamlanan talebin özeti, görüşme metni ve paylaştığınız iletişim bilgileri şifreli çağrı kaydında saklanabilir ve yapılandırılmış işletme sistemlerine aktarılabilir. Bu izin olmadan görüşebilirsiniz; talep kaydı oluşturulmaz.</p>
+      <h2>Saklama ve erişim</h2><p>Kayıtlar varsayılan olarak 30 gün sonra temizlenir. Yönetim erişimi korumalıdır ve ham konuşma içeriği uygulama loglarına yazılmaz.</p>
+      <h2>Üçüncü taraflar</h2><p>Yapılandırmaya göre Fish Audio, Anthropic, OpenAI veya telefon sağlayıcısı veriyi yalnızca hizmeti sunmak için işleyebilir. Müşteri kurulumunda sağlayıcılar ve hukuki dayanak ayrıca belirtilmelidir.</p>
+      <h2>İletişim</h2><p>{product.supportEmail ? <a href={`mailto:${product.supportEmail}`}>{product.supportEmail}</a> : "Bu portföy demosunda veri sorumlusu iletişim adresi yapılandırılmamıştır; gerçek müşteri kurulumu bu alan olmadan hazır sayılmaz."}</p>
+      <small>Bu metin ürün içi teknik bilgilendirmedir; işletmeye özel hukuki incelemenin yerine geçmez.</small>
+    </section>
+  </main>;
+}
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -222,6 +342,12 @@ export default function App() {
   ));
   const t = getCopy(locale);
   const scenarios = getPresentationScenarios(locale);
+  const [product, setProduct] = useState<ProductConfig>({
+    productName: "VoiceOps Studio", agentName: "Nova", businessName: "VoiceOps Studio",
+    tagline: "Global voice operations", supportEmail: null, privacyUrl: "/#/privacy",
+    portfolioAttribution: true,
+    plan: { name: "Managed Voice", includedMinutes: 300, overageTryPerMinute: 12, billingBasis: "active-voice-seconds" },
+  });
   const [status, setStatus] = useState<Status | null>(null);
   const [messages, setMessages] = useState<Message[]>(() => initialMessages(locale));
   const [text, setText] = useState("");
@@ -237,6 +363,9 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState<PresentationScenario["id"] | null>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(
     () => window.localStorage.getItem("voiceops-studio-privacy-consent") === "accepted",
+  );
+  const [storageConsent, setStorageConsent] = useState(
+    () => window.localStorage.getItem("voiceops-studio-storage-consent") === "accepted",
   );
   const [recordSaved, setRecordSaved] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -258,6 +387,11 @@ export default function App() {
 
   useEffect(() => {
     refreshStatus();
+    fetch("/api/product").then((response) => response.json()).then((config: ProductConfig) => {
+      setProduct(config);
+      setMessages((current) => current.length === 1 ? initialMessages(locale, config.agentName) : current);
+      document.title = `${config.productName} — Multilingual Voice AI`;
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -299,11 +433,17 @@ export default function App() {
     else window.localStorage.removeItem("voiceops-studio-privacy-consent");
   }
 
+  function setRecordConsent(accepted: boolean) {
+    setStorageConsent(accepted);
+    if (accepted) window.localStorage.setItem("voiceops-studio-storage-consent", "accepted");
+    else window.localStorage.removeItem("voiceops-studio-storage-consent");
+  }
+
   function changeLocale(nextLocale: Locale) {
     if (nextLocale === locale) return;
     cancelActiveTurn();
     setLocale(nextLocale);
-    setMessages(initialMessages(nextLocale));
+    setMessages(initialMessages(nextLocale, product.agentName));
     setCallState(initialCallState(nextLocale));
     setElapsedSeconds(0);
     setLatency(null);
@@ -351,7 +491,9 @@ export default function App() {
       if (input.text) body.append("text", input.text);
       if (input.audio) body.append("audio", input.audio, "recording.wav");
       body.append("callId", callIdRef.current);
-      body.append("consent", "true");
+      body.append("turnId", crypto.randomUUID());
+      body.append("noticeAcknowledged", "true");
+      body.append("storageConsent", String(storageConsent));
       body.append("locale", locale);
       body.append("history", JSON.stringify(historyAtStart));
       body.append("state", JSON.stringify(stateAtStart));
@@ -521,7 +663,7 @@ export default function App() {
 
   function resetCall() {
     cancelActiveTurn();
-    setMessages(initialMessages(locale));
+    setMessages(initialMessages(locale, product.agentName));
     setCallState(initialCallState(locale));
     setElapsedSeconds(0);
     setLatency(null);
@@ -540,7 +682,7 @@ export default function App() {
     void runTurn(
       { text: scenario.prompt },
       true,
-      { history: initialMessages(locale), state: initialCallState(locale), scenario },
+      { history: initialMessages(locale, product.agentName), state: initialCallState(locale), scenario },
     );
   }
 
@@ -559,7 +701,7 @@ export default function App() {
       `${t.time}: ${callState.requestedTime || t.notProvided}`,
       `${t.summary}: ${callState.summary}`,
       "",
-      ...messages.map((message) => `${message.role === "assistant" ? "Nova" : t.customer}: ${message.content}`),
+      ...messages.map((message) => `${message.role === "assistant" ? product.agentName : t.customer}: ${message.content}`),
     ];
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
     const anchor = document.createElement("a");
@@ -617,6 +759,9 @@ export default function App() {
       ? t.presentationLive
       : t.presentationReady;
 
+  if (location === "/admin") return <AdminDashboard product={product} />;
+  if (location === "/privacy") return <PrivacyPage product={product} />;
+
   return (
     <>
       <button className="skip-link" type="button" data-testid="button-skip-content"
@@ -624,13 +769,13 @@ export default function App() {
       <div className={`app-shell ${presentationMode ? "presentation-mode" : ""}`}>
         <header className="topbar">
           <Link className="brand" href="/" aria-label={t.home} data-testid="link-home">
-            <svg viewBox="0 0 40 40" role="img" aria-label="VoiceOps Studio">
+            <svg viewBox="0 0 40 40" role="img" aria-label={product.productName}>
               <path d="M9 20c0-8 4-12 11-12s11 4 11 12-4 12-11 12" />
               <path d="M14 16v8M20 13v14M26 16v8" />
             </svg>
             <span className="brand-copy">
-              <strong>VOICEOPS STUDIO</strong>
-              <small>{presentationMode ? "GLOBAL VOICE OPERATIONS / LIVE" : "GLOBAL VOICE OPERATIONS"}</small>
+              <strong>{product.productName.toLocaleUpperCase()}</strong>
+              <small>{product.tagline.toLocaleUpperCase()}{presentationMode ? " / LIVE" : ""}</small>
             </span>
           </Link>
           <div className="topbar-actions">
@@ -689,7 +834,7 @@ export default function App() {
               <span><i className="signal-dot" />10 LANGUAGES</span>
               <span><Activity size={14} />STREAMING INTELLIGENCE</span>
               <span><Radio size={14} />FISH S2 PRO VOICE</span>
-              <span><ShieldCheck size={14} />CONSENT-AWARE RECORDS</span>
+              <span><ShieldCheck size={14} />METERED USAGE + QUOTAS</span>
             </div>
             {presentationMode && <section className="presentation-console" aria-labelledby="presentation-scenarios-title">
               <div className="presentation-copy">
@@ -751,6 +896,11 @@ export default function App() {
                   onChange={(event) => setConsent(event.target.checked)} />
                 <span><strong>{t.consentStrong}</strong> {t.consentText}</span>
               </label>
+              <label className="consent-control optional-consent">
+                <input type="checkbox" checked={storageConsent}
+                  onChange={(event) => setRecordConsent(event.target.checked)} />
+                <span><strong>{t.storageConsentStrong}</strong> {t.storageConsentText} <a href={product.privacyUrl} target="_blank" rel="noreferrer">Privacy</a></span>
+              </label>
             </div>
           </section>
 
@@ -799,13 +949,13 @@ export default function App() {
                     <div className="avatar" aria-hidden="true">
                       {message.role === "assistant" ? <Bot size={16} /> : <UserRound size={16} />}
                     </div>
-                    <div><strong>{message.role === "assistant" ? "Nova" : t.you}</strong>
+                    <div><strong>{message.role === "assistant" ? product.agentName : t.you}</strong>
                       <p>{message.content}</p></div>
                   </article>
                 ))}
                 {busy && <article className="message assistant"><div className="avatar"><Bot size={16} /></div>
                   {streamingReply
-                    ? <div><strong>Nova</strong><p>{streamingReply}</p></div>
+                    ? <div><strong>{product.agentName}</strong><p>{streamingReply}</p></div>
                     : <div className="typing"><i /><i /><i /></div>}</article>}
                 <div ref={endRef} />
               </div>

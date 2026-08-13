@@ -76,31 +76,46 @@ async function ensureDataDirectory() {
   await mkdir(dataDirectory, { recursive: true, mode: 0o700 });
 }
 
-async function postWebhook(url: string, token: string | undefined, payload: unknown) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(token
-        ? { authorization: `Bearer ${token}` }
-        : {}),
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) throw new Error(`Entegrasyon webhook'u ${response.status} döndürdü.`);
+async function postWebhook(url: string, token: string | undefined, payload: unknown, eventId: string) {
+  if (!token?.trim()) throw new Error("Entegrasyon webhook token'ı yapılandırılmamış.");
+  if (process.env.NODE_ENV === "production" && new URL(url).protocol !== "https:") {
+    throw new Error("Production webhook adresi HTTPS olmalı.");
+  }
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+          "idempotency-key": eventId,
+          "x-voiceops-event": "call.completed",
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (response.ok) return;
+      lastError = new Error(`Entegrasyon webhook'u ${response.status} döndürdü.`);
+      if (response.status < 500 && response.status !== 429) break;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Entegrasyon webhook hatası.");
+    }
+  }
+  throw lastError || new Error("Entegrasyon webhook'u teslim edilemedi.");
 }
 
 async function forwardIntegrations(record: CallRecord) {
   const tasks: Promise<void>[] = [];
   if (process.env.CRM_WEBHOOK_URL) {
-    tasks.push(postWebhook(process.env.CRM_WEBHOOK_URL, process.env.CRM_WEBHOOK_TOKEN, record));
+    tasks.push(postWebhook(process.env.CRM_WEBHOOK_URL, process.env.CRM_WEBHOOK_TOKEN, record, record.id));
   }
   if (record.intent === "randevu" && process.env.CALENDAR_WEBHOOK_URL) {
     tasks.push(postWebhook(
       process.env.CALENDAR_WEBHOOK_URL,
       process.env.CALENDAR_WEBHOOK_TOKEN,
       {
+        ...record,
         id: record.id,
         callId: record.callId,
         createdAt: record.createdAt,
@@ -112,6 +127,7 @@ async function forwardIntegrations(record: CallRecord) {
         requestedTime: record.requestedTime,
         summary: record.summary,
       },
+      record.id,
     ));
   }
   if (tasks.length === 0) return false;

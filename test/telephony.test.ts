@@ -46,3 +46,35 @@ test("geçerli Twilio imzasını kabul eder", () => {
   assert.equal(nextCalled, true);
   assert.equal(res.statusCode, 200);
 });
+
+test("Twilio sırrı yoksa webhook'u kapalı reddeder", () => {
+  delete process.env.TWILIO_AUTH_TOKEN;
+  let nextCalled = false;
+  const req = { originalUrl: "/api/telephony/incoming", protocol: "https", body: {}, get() { return undefined; } };
+  const res = {
+    statusCode: 200,
+    status(code: number) { this.statusCode = code; return this; },
+    send() { return this; },
+  };
+  validateTwilioWebhook(req as never, res as never, () => { nextCalled = true; });
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 401);
+});
+
+test("hatalı Twilio imzasını reddeder", () => {
+  process.env.TWILIO_AUTH_TOKEN = "configured-token";
+  process.env.PUBLIC_BASE_URL = "https://voice.example.com";
+  let nextCalled = false;
+  const req = {
+    originalUrl: "/api/telephony/incoming", protocol: "https", body: { CallSid: "CA123" },
+    get(name: string) { return name.toLowerCase() === "x-twilio-signature" ? "invalid" : "voice.example.com"; },
+  };
+  const res = {
+    statusCode: 200,
+    status(code: number) { this.statusCode = code; return this; },
+    send() { return this; },
+  };
+  validateTwilioWebhook(req as never, res as never, () => { nextCalled = true; });
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 403);
+});

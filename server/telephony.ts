@@ -10,6 +10,7 @@ import { updateCallState } from "@shared/call-logic";
 import { generateAssistantReply } from "./assistant";
 import { synthesizeFishBuffer } from "./fish";
 import { recordCompletedCall } from "./records";
+import { assertUsageAvailable, recordUsage } from "./usage";
 
 type PhoneSession = {
   locale: Locale;
@@ -129,6 +130,8 @@ export function registerTelephonyRoutes(app: Express) {
       const session = getSession(callSid);
       session.updatedAt = Date.now();
 
+      await assertUsageAvailable();
+
       if (!transcript) {
         const prompt = unheardMessage(session.locale);
         const audioUrl = await createPhoneAudio(prompt, session.locale);
@@ -145,7 +148,7 @@ export function registerTelephonyRoutes(app: Express) {
         { role: "assistant" as const, content: reply },
       ]).slice(-20);
 
-      if (state.completed && !previousState.completed) {
+      if (process.env.TELEPHONY_RECORD_STORAGE === "enabled" && state.completed && !previousState.completed) {
         await recordCompletedCall({
           callId: callSid,
           source: "twilio",
@@ -155,6 +158,15 @@ export function registerTelephonyRoutes(app: Express) {
           history: session.history,
         });
       }
+
+      await recordUsage({
+        turnId: String(req.body.turnId || randomUUID()),
+        callId: callSid,
+        source: "twilio",
+        locale: session.locale,
+        inputText: transcript,
+        reply,
+      });
 
       const audioUrl = await createPhoneAudio(reply, session.locale);
       if (state.completed) {

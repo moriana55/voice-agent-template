@@ -9,6 +9,8 @@ This runbook covers the repository’s current deployment contract. Platform-spe
 - Liveness: `GET /api/health/live`
 - Readiness: `GET /api/health/ready`
 - Browser status: `GET /api/status`
+- Public white-label config: `GET /api/product`
+- Protected usage report: `GET /api/admin/usage?period=YYYY-MM`
 - Persistent data: `DATA_DIR/call-records.jsonl` when `RECORD_STORAGE` is enabled
 - Railway volume mount: `/app/data` with `DATA_DIR=/app/data`
 
@@ -28,9 +30,11 @@ The mode reflects runtime provider results after a request, not only whether a k
 2. Provide required secrets through the deployment platform; never bake `.env` into an image.
 3. Set `DATA_ENCRYPTION_KEY` and `ADMIN_API_KEY` when records are enabled.
 4. Set `PUBLIC_BASE_URL` and `TWILIO_AUTH_TOKEN` before enabling telephone traffic.
-5. Verify liveness, readiness, one consented browser turn, one rejected non-consented turn, and one signed Twilio request.
-6. Confirm log ingestion and alert delivery in the target platform.
-7. Record the deployed git revision and the previous known-good artifact.
+5. Set `USAGE_HARD_LIMIT_MINUTES` to a positive contractual ceiling for paid customers.
+6. Keep `TELEPHONY_RECORD_STORAGE=disabled` until the customer's recording basis and notice are approved.
+7. Verify liveness, readiness, one acknowledged browser turn, one separately consented saved record, one rejected non-acknowledged turn, one usage report, and one signed Twilio request.
+8. Confirm log ingestion and alert delivery in the target platform.
+9. Record the deployed git revision and the previous known-good artifact.
 
 ## Common incidents
 

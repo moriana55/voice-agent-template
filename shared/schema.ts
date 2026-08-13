@@ -20,7 +20,9 @@ export const callStateSchema = z.object({
 
 export const turnRequestSchema = z.object({
   callId: z.string().uuid().optional(),
-  consent: z.literal(true),
+  turnId: z.string().uuid().optional(),
+  noticeAcknowledged: z.literal(true),
+  storageConsent: z.boolean().default(false),
   locale: localeSchema.default("en"),
   text: z.string().max(4000).optional(),
   history: z.array(messageSchema).max(20).default([]),

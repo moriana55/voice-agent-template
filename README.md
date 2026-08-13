@@ -1,6 +1,6 @@
 # VoiceOps Studio — Multilingual Voice Operations Console
 
-VoiceOps Studio is a portfolio-grade voice-agent prototype for service businesses. It captures a customer request, extracts structured intent and missing details, speaks a response, and can persist a consent-aware call record across ten languages.
+VoiceOps Studio is a productized, white-label voice-agent MVP for service businesses. It captures a customer request, extracts structured intent and missing details, speaks a response, meters active voice usage, enforces monthly cost limits, and can persist a separately consented call record across ten languages.
 
 **[Open the live demo](https://voiceops-studio-production.up.railway.app/#/present)** · [Read the case study](docs/CASE_STUDY.md)
 
@@ -13,6 +13,7 @@ VoiceOps Studio is a portfolio-grade voice-agent prototype for service businesse
 - Optional Claude or OpenAI response generation plus a deterministic local decision engine for appointment, pricing, and support flows.
 - Streaming NDJSON responses, MediaSource audio playback, silence detection, request cancellation, and barge-in support.
 - Consent enforcement, optional AES-256-GCM record encryption, retention controls, admin authorization, and privacy-safe request logging.
+- Environment-driven customer branding, plan configuration, active-voice metering, monthly hard limits, and a protected operations dashboard.
 - Locale-aware Twilio voice webhooks with signature verification and `<Play>`/`<Say>` fallback behavior.
 - A responsive presentation console with light/dark themes and explicit live/degraded service state.
 
@@ -23,7 +24,7 @@ VoiceOps Studio is a portfolio-grade voice-agent prototype for service businesse
 | Ten-language intent flow | Shared locale contract plus automated appointment extraction tests for all ten locales | Verified |
 | Fish Audio TTS | Real MP3 response reproduced locally with Fish Audio S2 Pro | Verified |
 | First audio | 1.46 s observed in one Railway production smoke run on 2026-08-14; environment-dependent, not a benchmark | Observed |
-| Automated validation | `npm test` → 18 passing tests | Verified |
+| Automated validation | `npm test` → 23 passing tests | Verified |
 | Production bundle | `npm run check` and `npm run build` pass on Node 22 | Verified |
 | HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns | Verified |
 | Responsive UI | Browser-reviewed at 1440 px and 390 px without horizontal overflow | Verified |
@@ -53,6 +54,8 @@ Important implementation paths:
 - [`server/routes.ts`](server/routes.ts) — browser API, streaming, provider health, and fail-soft behavior
 - [`server/telephony.ts`](server/telephony.ts) — signed Twilio voice workflow
 - [`server/records.ts`](server/records.ts) — retention, encrypted records, and integrations
+- [`server/usage.ts`](server/usage.ts) — server-side active-voice metering, summaries, and monthly quota enforcement
+- [`server/product.ts`](server/product.ts) — safe public white-label configuration and paid-customer readiness gate
 - [`client/src/App.tsx`](client/src/App.tsx) — recording, interruption, streaming playback, and operator UI
 
 ## Engineering decisions
@@ -80,6 +83,8 @@ npm run dev
 ```
 
 Open `http://localhost:5177/#/present`. The interface and deterministic scenarios work without external credentials.
+
+The protected operations view is available at `http://localhost:5177/#/admin`; enter `ADMIN_API_KEY` in the in-memory login form to view monthly usage and consented lead records.
 
 To enable live speech, add `FISH_AUDIO_API_KEY` to `.env`. To enable open-ended model responses, also add either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Secret values stay server-side and `.env` is gitignored.
 
@@ -109,6 +114,8 @@ The repository includes [`railway.json`](railway.json) and a multi-stage [`Docke
 4. For call records that survive deployments, attach a Railway volume at `/app/data` and set `DATA_DIR=/app/data`.
 5. Run a prepared appointment scenario and verify `/api/status` before sharing the URL.
 
+For a paid customer deployment, set `CUSTOMER_MODE=true` and complete every customer/product variable in `.env.example`. Readiness then fails closed if branding, privacy contact, encryption, admin access, provider intelligence, allowed origins, or a positive monthly usage limit is missing.
+
 Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
 
 ## Operational safeguards implemented
@@ -117,6 +124,7 @@ Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
 - Health and readiness endpoints
 - Structured request logs with correlation IDs and without conversation content
 - Optional encrypted JSONL records, admin list/delete endpoints, and retention pruning
+- Server-side active-voice metering, protected monthly reports, and configurable hard quota enforcement
 - Twilio request signature verification in production
 - Docker multi-stage build running as a non-root user
 - Provider timeouts, cancellation propagation, and local fallback paths
@@ -125,7 +133,9 @@ See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY
 
 ## Current status and limits
 
-VoiceOps Studio has a public portfolio deployment, but it is not presented as a production-ready customer service. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single smoke run and does not claim an SLA.
+VoiceOps Studio has a public portfolio deployment and can be configured as a managed single-customer MVP. It is not a self-service multi-tenant SaaS or a production-readiness certification. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single smoke run and does not claim an SLA.
+
+The proposed commercial package, cost assumptions, billing basis, and scope boundary are documented in [`docs/COMMERCIAL_OFFER.md`](docs/COMMERCIAL_OFFER.md).
 
 Fish Audio, Anthropic, OpenAI, and Twilio are third-party services. This repository is not affiliated with or endorsed by those providers.
 

@@ -29,10 +29,12 @@ import {
 import { requireAdmin, turnLimiter } from "./security";
 import { synthesizeFishBuffer } from "./fish";
 import { registerTelephonyRoutes } from "./telephony";
+import { commercialReadiness, publicProductConfig } from "./product";
+import { assertUsageAvailable, recordUsage, usageSummary, wavDurationSeconds } from "./usage";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 12 * 1024 * 1024, files: 1, fields: 6, fieldSize: 100 * 1024 },
+  limits: { fileSize: 12 * 1024 * 1024, files: 1, fields: 10, fieldSize: 100 * 1024 },
   fileFilter: (_req, file, callback) => {
     if (file.mimetype.startsWith("audio/")) callback(null, true);
     else callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
@@ -43,7 +45,7 @@ type StreamEvent =
   | { type: "meta"; transcript: string; state: CallState; mode: string }
   | { type: "text_delta"; text: string }
   | { type: "audio"; audioBase64: string; audioMime: string }
-  | { type: "done"; reply: string; latencyMs: number; firstAudioMs: number | null; audioWarning: string | null; recorded: boolean }
+  | { type: "done"; reply: string; latencyMs: number; firstAudioMs: number | null; audioWarning: string | null; recorded: boolean; usageSeconds: number }
   | { type: "error"; message: string };
 
 class AsyncTextQueue implements AsyncIterable<string>, AsyncIterator<string> {
@@ -438,13 +440,19 @@ export async function registerRoutes(
     const recordConfiguration = recordsStatus();
     const privacyReady = !recordConfiguration.enabled || recordConfiguration.encrypted
       || process.env.NODE_ENV !== "production";
-    const ready = fishAudio && brain && privacyReady;
+    const commercial = commercialReadiness();
+    const ready = fishAudio && brain && privacyReady && commercial.ready;
     res.status(ready ? 200 : 503).json({
       ready,
       services: { fishAudio, brain },
       privacyReady,
+      commercial,
       records: recordConfiguration,
     });
+  });
+
+  app.get("/api/product", (_req, res) => {
+    res.json(publicProductConfig());
   });
 
   app.get("/api/admin/records", requireAdmin, async (req, res, next) => {
@@ -460,6 +468,14 @@ export async function registerRoutes(
     try {
       const deleted = await deleteCallRecord(String(req.params.id));
       return deleted ? res.sendStatus(204) : res.sendStatus(404);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.get("/api/admin/usage", requireAdmin, async (req, res, next) => {
+    try {
+      return res.json(await usageSummary(String(req.query.period || new Date().toISOString().slice(0, 7))));
     } catch (error) {
       return next(error);
     }
@@ -494,6 +510,7 @@ export async function registerRoutes(
         speech: process.env.FISH_AUDIO_MODEL || "s2-pro",
       },
       records: recordsStatus(),
+      product: publicProductConfig(),
       localization: {
         defaultLocale: DEFAULT_LOCALE,
         supportedLocales,
@@ -514,12 +531,16 @@ export async function registerRoutes(
       const parsedState = req.body.state ? JSON.parse(req.body.state) : undefined;
       const payload = turnRequestSchema.parse({
         callId: req.body.callId || undefined,
-        consent: req.body.consent === "true",
+        turnId: req.body.turnId || undefined,
+        noticeAcknowledged: req.body.noticeAcknowledged === "true",
+        storageConsent: req.body.storageConsent === "true",
         locale: req.body.locale || undefined,
         text: req.body.text || undefined,
         history: parsedHistory,
         state: parsedState,
       });
+
+      await assertUsageAvailable();
 
       const demo = isDemoBrain();
       const fishEnabled = Boolean(process.env.FISH_AUDIO_API_KEY);
@@ -703,7 +724,7 @@ export async function registerRoutes(
         }
       }
 
-      if (state.completed && !payload.state?.completed) {
+      if (payload.storageConsent && state.completed && !payload.state?.completed) {
         const result = await recordCompletedCall({
           callId: payload.callId || randomUUID(),
           source: "web",
@@ -719,6 +740,17 @@ export async function registerRoutes(
         recorded = result.saved;
       }
 
+
+      const usage = await recordUsage({
+        turnId: payload.turnId,
+        callId: payload.callId || randomUUID(),
+        source: "web",
+        locale: payload.locale,
+        inputSeconds: req.file ? wavDurationSeconds(req.file.buffer) : undefined,
+        inputText: req.file ? undefined : transcript,
+        reply,
+      });
+
       writeStreamEvent(res, {
         type: "done",
         reply: reply.trim(),
@@ -726,6 +758,7 @@ export async function registerRoutes(
         firstAudioMs,
         audioWarning,
         recorded,
+        usageSeconds: usage?.billableSeconds || 0,
       });
       return res.end();
     } catch (error) {
@@ -750,12 +783,16 @@ export async function registerRoutes(
       const parsedState = req.body.state ? JSON.parse(req.body.state) : undefined;
       const payload = turnRequestSchema.parse({
         callId: req.body.callId || undefined,
-        consent: req.body.consent === "true",
+        turnId: req.body.turnId || undefined,
+        noticeAcknowledged: req.body.noticeAcknowledged === "true",
+        storageConsent: req.body.storageConsent === "true",
         locale: req.body.locale || undefined,
         text: req.body.text || undefined,
         history: parsedHistory,
         state: parsedState,
       });
+
+      await assertUsageAvailable();
 
       const demo = isDemoBrain();
       const fishEnabled = Boolean(process.env.FISH_AUDIO_API_KEY);
@@ -804,7 +841,7 @@ export async function registerRoutes(
       }
 
       let recorded = false;
-      if (state.completed && !payload.state?.completed) {
+      if (payload.storageConsent && state.completed && !payload.state?.completed) {
         const result = await recordCompletedCall({
           callId: payload.callId || randomUUID(),
           source: "web",
@@ -820,6 +857,17 @@ export async function registerRoutes(
         recorded = result.saved;
       }
 
+
+      const usage = await recordUsage({
+        turnId: payload.turnId,
+        callId: payload.callId || randomUUID(),
+        source: "web",
+        locale: payload.locale,
+        inputSeconds: req.file ? wavDurationSeconds(req.file.buffer) : undefined,
+        inputText: req.file ? undefined : transcript,
+        reply,
+      });
+
       return res.json({
         transcript,
         reply,
@@ -830,6 +878,7 @@ export async function registerRoutes(
         latencyMs: Date.now() - startedAt,
         state,
         recorded,
+        usageSeconds: usage?.billableSeconds || 0,
       });
     } catch (error) {
       next(error);

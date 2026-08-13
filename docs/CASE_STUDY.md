@@ -4,7 +4,7 @@
 
 ## Positioning
 
-VoiceOps Studio demonstrates how a multilingual customer-call workflow can preserve language context, structured state, live speech, privacy boundaries, and provider fallback across both browser and telephone channels.
+VoiceOps Studio demonstrates how a multilingual customer-call product can preserve language context, structured state, live speech, privacy boundaries, provider fallback, and billable usage evidence across browser and telephone channels.
 
 ## Problem
 
@@ -20,15 +20,17 @@ Repository history attributes the current implementation to Yiğit Ertürk. The 
 2. Deterministic slot extraction owns the business state; generative providers improve conversational phrasing without becoming the only source of truth.
 3. Runtime provider health can downgrade the displayed mode from fully live to Fish-only or demo behavior.
 4. Raw audio is ephemeral; completed records are bounded, optionally encrypted, and subject to retention pruning.
+5. Paid-customer readiness is an explicit runtime gate: missing business identity, privacy contact, encryption, provider intelligence, origins, admin access, or a monthly hard limit makes readiness fail.
+6. Usage is metered server-side as active voice seconds and summarized monthly without retaining raw audio or plaintext call identifiers.
 
-## Evidence snapshot — 2026-08-13
+## Evidence snapshot — 2026-08-14
 
 | Evidence | Result |
 | --- | --- |
 | TypeScript check | Passed |
-| Automated tests | 18 passed |
+| Automated tests | 23 passed |
 | Production build | Passed |
-| Production HTTP/Twilio smoke | Passed, 10 checks |
+| Production HTTP/Twilio smoke | Passed, 13 checks |
 | Fish Audio MP3 generation | Passed |
 | Desktop browser review | Passed at 1440 × 900 |
 | Mobile browser review | Passed at 390 × 844 with no horizontal overflow |
@@ -47,7 +49,7 @@ The 1.02 s first-audio number visible in the screenshot is one observed local ru
 
 ## Known limits
 
-- No production deployment, real-user traffic, uptime history, or SLA has been verified.
+- A public Railway deployment exists, but real-user traffic, uptime history, and an SLA have not been verified.
 - Load, abuse, backup/restore, and disaster-recovery testing remain out of scope.
 - Legal and data-processing requirements must be reviewed for each operating jurisdiction.
 - Live provider behavior, cost, and latency depend on third-party accounts and network conditions.
@@ -62,4 +64,4 @@ The 1.02 s first-audio number visible in the screenshot is one observed local ru
 - [x] README links and setup commands reviewed
 - [x] MIT License added before inviting reuse or contributions
 - [x] Repository visibility change explicitly approved and completed
-- [ ] Add a public deployment URL only after production-specific checks
+- [x] Public portfolio deployment added after production-specific smoke checks
