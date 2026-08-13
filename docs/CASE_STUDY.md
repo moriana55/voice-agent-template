@@ -59,5 +59,5 @@ The 1.02 s first-audio number visible in the screenshot is one observed local ru
 - [x] Test and latency numbers dated and qualified
 - [x] README links and setup commands reviewed
 - [x] MIT License added before inviting reuse or contributions
-- [ ] Confirm repository visibility change explicitly before making it public
+- [x] Repository visibility change explicitly approved and completed
 - [ ] Add a public deployment URL only after production-specific checks
