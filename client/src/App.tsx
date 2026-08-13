@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
-  ArrowRight, AudioLines, BadgeDollarSign, Bot, CalendarClock, Check,
+  Activity, ArrowRight, AudioLines, BadgeDollarSign, Bot, CalendarClock, Check,
   CircleStop, Download, Headphones, Mic, MonitorPlay, Moon,
-  PhoneCall, RefreshCw, RotateCcw, Send, ShieldCheck, Sun, UserRound,
+  PhoneCall, Radio, RefreshCw, RotateCcw, Send, ShieldCheck, Sun, UserRound,
   Waves, Wrench,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -232,7 +232,7 @@ export default function App() {
   const [latency, setLatency] = useState<number | null>(null);
   const [callState, setCallState] = useState<CallState>(() => initialCallState(locale));
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [dark, setDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  const [dark, setDark] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
   const [activeScenario, setActiveScenario] = useState<PresentationScenario["id"] | null>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(
@@ -386,6 +386,7 @@ export default function App() {
             else setError(`${t.audioWarning}: ${event.audioWarning}`);
           }
           if (event.recorded) setRecordSaved(true);
+          refreshStatus();
         } else if (event.type === "error") {
           throw new Error(event.message);
         }
@@ -611,7 +612,7 @@ export default function App() {
     [t.time, callState.requestedTime],
   ] as const;
   const presentationStatus = usingFallback
-    ? t.presentationFallback
+    ? status?.mode === "fish-live" ? t.liveFish : t.presentationFallback
     : status?.mode === "live"
       ? t.presentationLive
       : t.presentationReady;
@@ -627,7 +628,10 @@ export default function App() {
               <path d="M9 20c0-8 4-12 11-12s11 4 11 12-4 12-11 12" />
               <path d="M14 16v8M20 13v14M26 16v8" />
             </svg>
-            <span>ARAMA{presentationMode ? " / LIVE DEMO" : ""}</span>
+            <span className="brand-copy">
+              <strong>ARAMA</strong>
+              <small>{presentationMode ? "GLOBAL VOICE OPERATIONS / LIVE" : "GLOBAL VOICE OPERATIONS"}</small>
+            </span>
           </Link>
           <div className="topbar-actions">
             <span className="call-timer" data-testid="text-call-duration">{formatDuration(elapsedSeconds)}</span>
@@ -676,8 +680,16 @@ export default function App() {
                     ? latency ? `${(latency / 1000).toFixed(2)} s` : t.measuring
                     : status?.credit != null ? `$${status.credit.toFixed(4)}` : "—"}
                 </strong>
-                <small>{presentationMode ? usingFallback ? t.safeFallback : t.liveMeasurement : latency ? `${t.firstAudio.toLocaleLowerCase()} ${(latency / 1000).toFixed(1)} s` : t.ready}</small>
+                <small>{presentationMode
+                  ? usingFallback && status?.mode !== "fish-live" ? t.safeFallback : t.liveMeasurement
+                  : latency ? `${t.firstAudio.toLocaleLowerCase()} ${(latency / 1000).toFixed(1)} s` : t.ready}</small>
               </div>
+            </div>
+            <div className="capability-rail" aria-label="Platform capabilities">
+              <span><i className="signal-dot" />10 LANGUAGES</span>
+              <span><Activity size={14} />STREAMING INTELLIGENCE</span>
+              <span><Radio size={14} />FISH S2 PRO VOICE</span>
+              <span><ShieldCheck size={14} />CONSENT-AWARE RECORDS</span>
             </div>
             {presentationMode && <section className="presentation-console" aria-labelledby="presentation-scenarios-title">
               <div className="presentation-copy">
@@ -706,14 +718,21 @@ export default function App() {
             </section>}
             <div className={`voice-orbit ${recording ? "recording" : ""} ${busy ? "thinking" : ""}`}>
               <div className="orbit-line orbit-one" /><div className="orbit-line orbit-two" />
+              <div className="signal-scan" aria-hidden="true" />
+              <div className="voice-spectrum" aria-hidden="true">
+                {Array.from({ length: 24 }, (_, index) => <i key={index} />)}
+              </div>
               <div className="voice-core">
                 {recording ? <Waves size={44} /> : busy ? <AudioLines size={44} /> : <Headphones size={44} />}
               </div>
+              <span className="orbit-coordinate coordinate-left">40.7128° N</span>
+              <span className="orbit-coordinate coordinate-right">VOICE / 01</span>
               <span className="orbit-label label-top">{t.customerOrbit}</span>
               <span className="orbit-label label-right">FISH S2 PRO</span>
               <span className="orbit-label label-bottom">{status?.services.anthropic ? "CLAUDE" : status?.services.openai ? "OPENAI" : t.rulesEngine}</span>
             </div>
             <div className="primary-control">
+              <span className="control-kicker"><i />VOICE CHANNEL READY</span>
               <button className={`talk-button ${recording ? "recording" : ""}`} type="button"
                 data-testid="button-record"
                 onClick={recording ? stopRecording : startRecording} disabled={!privacyAccepted}>
@@ -756,7 +775,7 @@ export default function App() {
               </div>
               {presentationMode && <p className={`notice ${usingFallback ? "fallback-notice" : ""}`} data-testid="status-notice">
                 {usingFallback
-                  ? t.fallbackActive
+                  ? status?.mode === "fish-live" ? t.fishNotice : t.fallbackActive
                   : busy
                     ? t.processing
                     : activeScenario

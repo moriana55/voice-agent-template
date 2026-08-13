@@ -1,89 +1,87 @@
-# Arama — Multilingual Voice Agent
+# Arama — Multilingual Voice Operations Console
 
-10 dil destekli düşük gecikmeli çağrı elemanı prototipi. Tarayıcıdan mikrofon
-kaydı alır, OpenAI veya Fish Audio ile seçilen dilde yazıya çevirir, Claude ya
-da OpenAI ile cevabı üretir ve Fish Audio ile konuşur. API anahtarları yokken
-yerleşik demo motoru sayesinde arayüz, yapılandırılmış çağrı kaydı ve senaryo
-akışı çalışmaya devam eder.
+Arama is a portfolio-grade voice-agent prototype for service businesses. It captures a customer request, extracts structured intent and missing details, speaks a response, and can persist a consent-aware call record across ten languages.
 
-Desteklenen diller: İngilizce, Türkçe, İspanyolca, Almanca, Fransızca,
-İtalyanca, Portekizce, Felemenkçe, Lehçe ve Rusça. Dil görüşme sırasında
-arayüzden seçilir; seçim transkripsiyon, niyet çıkarımı, model talimatı, ses
-sentezi, yerel demo ve indirilen özete birlikte uygulanır.
+![Arama voice operations console](docs/assets/arama-console.jpg)
 
-## Kurulum
+## What it demonstrates
+
+- Ten shared locales across the browser, transcription, decision logic, speech synthesis, Twilio, and persisted records: English, Turkish, Spanish, German, French, Italian, Portuguese, Dutch, Polish, and Russian.
+- Live Fish Audio speech synthesis with browser speech fallback when a provider is unavailable.
+- Optional Claude or OpenAI response generation plus a deterministic local decision engine for appointment, pricing, and support flows.
+- Streaming NDJSON responses, MediaSource audio playback, silence detection, request cancellation, and barge-in support.
+- Consent enforcement, optional AES-256-GCM record encryption, retention controls, admin authorization, and privacy-safe request logging.
+- Locale-aware Twilio voice webhooks with signature verification and `<Play>`/`<Say>` fallback behavior.
+- A responsive presentation console with light/dark themes and explicit live/degraded service state.
+
+## Verified evidence
+
+| Claim | Current evidence | State |
+| --- | --- | --- |
+| Ten-language intent flow | Shared locale contract plus automated appointment extraction tests for all ten locales | Verified |
+| Fish Audio TTS | Real MP3 response reproduced locally with Fish Audio S2 Pro | Verified |
+| First audio | 1.02 s observed in one local presentation run on 2026-08-13; environment-dependent, not a benchmark | Observed |
+| Automated validation | `npm test` → 18 passing tests | Verified |
+| Production bundle | `npm run check` and `npm run build` pass on Node 22 | Verified |
+| HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns | Verified |
+| Responsive UI | Browser-reviewed at 1440 px and 390 px without horizontal overflow | Verified |
+
+The verification date and release boundary are recorded in [`projects/arama-voice-agent/docs/delivery/system-state.yaml`](projects/arama-voice-agent/docs/delivery/system-state.yaml).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Browser or Twilio] --> B[Express API]
+    B --> C[Fish Audio or OpenAI transcription]
+    C --> D[Shared locale-aware call state]
+    D --> E[Claude / OpenAI]
+    D --> F[Deterministic local engine]
+    E --> G[Fish Audio S2 Pro]
+    F --> G
+    G --> H[Streaming browser audio or TwiML]
+    D --> I[Encrypted call record]
+    I --> J[Optional CRM / calendar webhooks]
+```
+
+Important implementation paths:
+
+- [`shared/i18n.ts`](shared/i18n.ts) — locale contract and metadata
+- [`shared/call-logic.ts`](shared/call-logic.ts) — deterministic intent and slot extraction
+- [`server/routes.ts`](server/routes.ts) — browser API, streaming, provider health, and fail-soft behavior
+- [`server/telephony.ts`](server/telephony.ts) — signed Twilio voice workflow
+- [`server/records.ts`](server/records.ts) — retention, encrypted records, and integrations
+- [`client/src/App.tsx`](client/src/App.tsx) — recording, interruption, streaming playback, and operator UI
+
+## Engineering decisions
+
+### One locale contract, end to end
+
+The locale is not treated as presentation-only state. A shared contract carries it through UI copy, speech recognition, prompts, deterministic extraction, voice selection, Twilio, summaries, and records. This reduces cross-layer language drift.
+
+### Fail soft without pretending everything is live
+
+Provider health is based on runtime results, not only the presence of an environment variable. If live intelligence fails while Fish remains available, the interface reports `FISH LIVE`, uses the local decision engine, and keeps real speech output active.
+
+### Store the minimum useful record
+
+Raw audio is not persisted. Completed requests can store a bounded transcript and structured call state, optionally encrypted at rest. Logs contain request metadata rather than customer speech or contact details.
+
+## Run locally
+
+Requirements: Node.js 22+ and npm.
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 npm run dev
 ```
 
-`http://localhost:5177` adresini açın.
+Open `http://localhost:5177/#/present`. The interface and deterministic scenarios work without external credentials.
 
-Sunum için doğrudan `http://localhost:5177/#/present` adresini açın. Bu görünüm;
-üç tek tık senaryo, büyük ilk-ses ölçümü, sadeleştirilmiş servis durumu ve canlı
-servis kesilirse otomatik yerel sesli yedek içerir. API anahtarları, bakiye ve ham
-servis hataları sunum ekranında gösterilmez.
+To enable live speech, add `FISH_AUDIO_API_KEY` to `.env`. To enable open-ended model responses, also add either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Secret values stay server-side and `.env` is gitignored.
 
-## Bağlantılar
-
-- `ANTHROPIC_API_KEY`: Claude ile cevap üretimi
-- `ANTHROPIC_MODEL`: Claude modeli (varsayılan: `claude-haiku-4-5-20251001`)
-- `OPENAI_API_KEY`: isteğe bağlı OpenAI transkripsiyonu ve Claude yoksa cevap üretimi
-- `FISH_AUDIO_API_KEY`: Fish Audio TTS
-- `FISH_AUDIO_REFERENCE_ID`: kullanılacak/klonlanmış Fish sesi
-- `FISH_AUDIO_REFERENCE_ID_EN`, `_TR`, `_ES`, `_DE`, `_FR`, `_IT`, `_PT`,
-  `_NL`, `_PL`, `_RU`: dile özel ses kimlikleri; tanımsızsa ortak ses kullanılır
-- `AGENT_LANG`: API/telefon isteği dil belirtmezse varsayılan dil (`en`)
-- `DEMO_MODE=false`: gerçek bağlantıları zorunlu kılar
-
-API anahtarları yalnızca Express sunucusunda tutulur; tarayıcıya gönderilmez.
-
-## Akış
-
-1. Düğmeye basıp konuş, kaydı bitirerek gönder veya metin yaz.
-2. İstemci seçilen dili `locale` alanıyla API'ye taşır; `/api/turn` ses dosyasını
-   aynı dil koduyla OpenAI veya Fish Audio transcription servisine gönderir.
-3. `/api/turn/stream`, görüşme niyetine uygun kısa girişi anında başlatır.
-4. Claude Messages API cevabı SSE parçaları hâlinde üretirken Fish Audio'nun
-   resmî JavaScript SDK'sı metni WebSocket TTS akışına besler.
-5. Fish MP3 parçalarını üretildikçe tarayıcıya yollar; MediaSource oynatımı tüm
-   dosyayı beklemeden başlar. Fish anahtarı yoksa sistem konuşma sentezi kullanılır.
-
-Bu sürüm bas-konuş mantığında düşük gecikmeli Claude + Fish WebSocket TTS
-streaming kullanır. Tarayıcı sessizliği algılayıp kaydı otomatik gönderir; kullanıcı
-yanıt sürerken mikrofona basarak oynatmayı ve devam eden API isteğini kesebilir.
-
-## Production özellikleri
-
-- `npm start` ile çalışan tek production paketi; Node 22 hedefi ve Dockerfile
-- İstek/sağlık loglarında kişisel veri taşımayan yapılandırılmış JSON kayıtları
-- Genel API ve görüşme endpointleri için IP tabanlı hız sınırı
-- Aynı-origin koruması, güvenlik başlıkları ve ses dosyası boyut/tür sınırı
-- Tamamlanan lead/randevular için kalıcı JSONL kayıt ve isteğe bağlı AES-256-GCM şifreleme
-- Yetkili kayıt listeleme/silme endpointleri ve varsayılan 30 günlük saklama süresi
-- CRM ve takvim için bağımsız webhook adaptörleri
-- Twilio gelen arama webhooku, locale uyumlu speech gather ve Fish Audio MP3 `<Play>` yanıtı
-- İstemciden sunucuya taşınan iptal sinyali, sessizlik algılama ve açık rıza kontrolü
-- Node test runner testleri, GitHub Actions CI ve production HTTP smoke testi
-
-Production ortamında `DATA_ENCRYPTION_KEY`, `ADMIN_API_KEY` ve kullanılacak servis
-anahtarlarını zorunlu secret olarak tanımlayın. Ayrıntılar için `PRIVACY.md` dosyasına bakın.
-
-## Telefon hattı
-
-1. Uygulamayı HTTPS ile dışarı açın ve `PUBLIC_BASE_URL` değerini yazın.
-2. Twilio numarasının gelen arama webhookunu `POST /api/telephony/incoming` yapın.
-   Hat dilini URL'de örneğin `?locale=tr`, `?locale=de` veya `?locale=fr` ile seçin.
-3. `TWILIO_AUTH_TOKEN` değerini secret olarak ekleyin.
-4. Fish anahtarı ve public URL varsa yanıt MP3 olarak üretilip Twilio `<Play>` ile çalınır;
-   Fish yoksa Twilio seçilen locale ile `<Say>` yedeğini kullanır.
-
-Webhook imzası production ortamında zorunludur. Telefon adaptörü Twilio'nun `CallSid`
-değeriyle görüşme durumunu tutar ve tamamlanan talebi normal kayıt/CRM akışına gönderir.
-
-## Doğrulama
+## Validate
 
 ```bash
 npm run check
@@ -91,14 +89,44 @@ npm test
 npm run build
 ```
 
-Test paketi on dilde randevu niyeti, göreli tarih ve saat çıkarımını; ayrıca
-uluslararası telefon/isim tamamlama, şifreli kayıt ve Twilio locale üretimini kapsar.
-
-Production sunucusu ayrı bir terminalde çalışırken uçtan uca yerel kontrol:
+For the production HTTP/Twilio smoke flow, start the production bundle with isolated test environment values, then run:
 
 ```bash
 SMOKE_BASE_URL=http://127.0.0.1:5193 npm run smoke:http
 ```
 
-Canlılık: `GET /api/health/live`  
-Hazırlık: `GET /api/health/ready`
+CI runs `npm ci`, type checking, all tests, and the production build on every push and pull request.
+
+## Deploy on Railway
+
+The repository includes [`railway.json`](railway.json) and a multi-stage [`Dockerfile`](Dockerfile). Railway uses the Docker image, waits for `/api/health/live`, and restarts the service after process failures.
+
+1. Create a Railway service from this GitHub repository.
+2. Add provider and security values from `.env.example` in Railway Variables; do not upload the local `.env` file.
+3. Generate a temporary `*.up.railway.app` domain under **Settings → Networking**.
+4. For call records that survive deployments, attach a Railway volume at `/app/data` and set `DATA_DIR=/app/data`.
+5. Run a prepared appointment scenario and verify `/api/status` before sharing the URL.
+
+Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
+
+## Operational safeguards implemented
+
+- Security headers, same-origin checks, request size limits, and IP-based rate limiting
+- Health and readiness endpoints
+- Structured request logs with correlation IDs and without conversation content
+- Optional encrypted JSONL records, admin list/delete endpoints, and retention pruning
+- Twilio request signature verification in production
+- Docker multi-stage build running as a non-root user
+- Provider timeouts, cancellation propagation, and local fallback paths
+
+See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY.md`](SECURITY.md) for private vulnerability reporting, and [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for runtime modes, incidents, and rollback boundaries.
+
+## Current status and limits
+
+Arama is an actively developed portfolio prototype, not a deployed production service. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single local run and does not claim an SLA.
+
+Fish Audio, Anthropic, OpenAI, and Twilio are third-party services. This repository is not affiliated with or endorsed by those providers.
+
+Released under the [MIT License](LICENSE).
+
+Additional portfolio notes and the publication gate are in [`docs/CASE_STUDY.md`](docs/CASE_STUDY.md).

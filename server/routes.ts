@@ -64,13 +64,16 @@ class AsyncTextQueue implements AsyncIterable<string>, AsyncIterator<string> {
     this.waiters.splice(0).forEach((waiter) => waiter({ value: undefined, done: true }));
   }
 
-  async waitUntilDrained() {
+  async waitUntilDrained(timeoutMs = 750) {
+    const deadline = Date.now() + timeoutMs;
     while (this.values.length > 0) {
+      if (Date.now() >= deadline) return false;
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
     // Iterator metni kuyruktan aldıktan sonra SDK'nın WebSocket'e TextEvent
     // yazmasına bir event-loop turu bırak. Böylece FlushEvent metnin önüne geçmez.
     await new Promise<void>((resolve) => setImmediate(resolve));
+    return true;
   }
 
   next(): Promise<IteratorResult<string>> {
@@ -95,6 +98,45 @@ function isDemoBrain() {
     || (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY);
 }
 
+type ProviderName = "anthropic" | "openai" | "fishAudio";
+const providerHealth: Record<ProviderName, boolean | null> = {
+  anthropic: null,
+  openai: null,
+  fishAudio: null,
+};
+
+function providerAvailable(provider: ProviderName, configured: boolean) {
+  return configured && providerHealth[provider] !== false;
+}
+
+function currentMode(demo: boolean, fishConfigured: boolean) {
+  const brainAvailable = !demo && (
+    providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY))
+    || providerAvailable("openai", Boolean(process.env.OPENAI_API_KEY))
+  );
+  const fishAvailable = providerAvailable("fishAudio", fishConfigured);
+  return brainAvailable ? "live" : fishAvailable ? "fish-live" : "demo";
+}
+
+const fallbackWarnings: Record<Locale, { brain: string; voice: string }> = {
+  en: { brain: "Live intelligence is unavailable; the secure local fallback is active.", voice: "Live voice is unavailable; browser audio is active." },
+  tr: { brain: "Canlı zekâ servisine ulaşılamadı; güvenli yerel yedek devrede.", voice: "Canlı ses servisine ulaşılamadı; tarayıcı sesi devrede." },
+  es: { brain: "La inteligencia en vivo no está disponible; el respaldo local seguro está activo.", voice: "La voz en vivo no está disponible; el audio del navegador está activo." },
+  de: { brain: "Die Live-Intelligenz ist nicht verfügbar; das sichere lokale Backup ist aktiv.", voice: "Die Live-Stimme ist nicht verfügbar; Browser-Audio ist aktiv." },
+  fr: { brain: "L’intelligence en direct est indisponible ; le secours local sécurisé est actif.", voice: "La voix en direct est indisponible ; l’audio du navigateur est actif." },
+  it: { brain: "L’intelligenza live non è disponibile; il fallback locale sicuro è attivo.", voice: "La voce live non è disponibile; l’audio del browser è attivo." },
+  pt: { brain: "A inteligência ao vivo está indisponível; o fallback local seguro está ativo.", voice: "A voz ao vivo está indisponível; o áudio do navegador está ativo." },
+  nl: { brain: "Live-intelligentie is niet beschikbaar; de veilige lokale fallback is actief.", voice: "Live-stem is niet beschikbaar; browseraudio is actief." },
+  pl: { brain: "Inteligencja na żywo jest niedostępna; działa bezpieczny tryb lokalny.", voice: "Głos na żywo jest niedostępny; działa dźwięk przeglądarki." },
+  ru: { brain: "Онлайн-интеллект недоступен; включён безопасный локальный режим.", voice: "Онлайн-голос недоступен; включён звук браузера." },
+};
+
+function providerFailure(service: string, error: unknown, provider?: ProviderName) {
+  if (provider) providerHealth[provider] = false;
+  const detail = error instanceof Error ? error.message : String(error);
+  console.warn(`[provider fallback] ${service}: ${detail}`);
+}
+
 async function transcribeAudio(openai: OpenAI, file: Express.Multer.File, locale: Locale, signal?: AbortSignal) {
   const uploaded = await toFile(file.buffer, file.originalname || "recording.webm", {
     type: file.mimetype || "audio/webm",
@@ -104,6 +146,7 @@ async function transcribeAudio(openai: OpenAI, file: Express.Multer.File, locale
     model: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe",
     language: transcriptionLanguage(locale),
   }, { signal: withTimeout(signal, 20_000) });
+  providerHealth.openai = true;
   return result.text.trim();
 }
 
@@ -123,8 +166,10 @@ async function transcribeFish(file: Express.Multer.File, locale: Locale, signal?
   });
   if (!response.ok) {
     const detail = await response.text();
+    providerHealth.fishAudio = false;
     throw new Error(`Fish ASR ${response.status}: ${detail.slice(0, 240)}`);
   }
+  providerHealth.fishAudio = true;
   const result = await response.json() as { text: string };
   return result.text.trim();
 }
@@ -140,7 +185,11 @@ function getFishCredit() {
         headers: { Authorization: `Bearer ${process.env.FISH_AUDIO_API_KEY}` },
         signal: AbortSignal.timeout(4_000),
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) providerHealth.fishAudio = false;
+        return;
+      }
+      providerHealth.fishAudio = true;
       const result = await response.json() as { credit: string };
       const value = Number(result.credit);
       if (Number.isFinite(value)) fishCreditCache = { value, expiresAt: Date.now() + 60_000 };
@@ -210,6 +259,7 @@ async function generateOpenAIReply(
     input: buildConversationPrompt(transcript, history, state, locale),
     store: false,
   }, { signal: withTimeout(signal, 20_000) });
+  providerHealth.openai = true;
   return response.output_text.trim();
 }
 
@@ -243,8 +293,10 @@ async function generateClaudeReply(
 
   if (!response.ok) {
     const detail = await response.text();
+    providerHealth.anthropic = false;
     throw new Error(`Claude API ${response.status}: ${detail.slice(0, 240)}`);
   }
+  providerHealth.anthropic = true;
 
   const result = await response.json() as {
     content?: Array<{ type: string; text?: string }>;
@@ -299,8 +351,10 @@ ${responseInstruction}`,
 
   if (!response.ok) {
     const detail = await response.text();
+    providerHealth.anthropic = false;
     throw new Error(`Claude API ${response.status}: ${detail.slice(0, 240)}`);
   }
+  providerHealth.anthropic = true;
   if (!response.body) throw new Error("Claude API akış gövdesi döndürmedi.");
 
   const reader = response.body.getReader();
@@ -356,7 +410,14 @@ function writeStreamEvent(res: Response, event: StreamEvent) {
 }
 
 async function synthesizeFish(text: string, locale: Locale, signal?: AbortSignal) {
-  return (await synthesizeFishBuffer(text, { signal, locale })).toString("base64");
+  try {
+    const audio = await synthesizeFishBuffer(text, { signal, locale });
+    providerHealth.fishAudio = true;
+    return audio.toString("base64");
+  } catch (error) {
+    providerHealth.fishAudio = false;
+    throw error;
+  }
 }
 
 export async function registerRoutes(
@@ -370,8 +431,9 @@ export async function registerRoutes(
   });
 
   app.get("/api/health/ready", (_req, res) => {
-    const fishAudio = Boolean(process.env.FISH_AUDIO_API_KEY);
-    const brain = Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY)
+    const fishAudio = providerAvailable("fishAudio", Boolean(process.env.FISH_AUDIO_API_KEY));
+    const brain = providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY))
+      || providerAvailable("openai", Boolean(process.env.OPENAI_API_KEY))
       || process.env.DEMO_MODE !== "false";
     const recordConfiguration = recordsStatus();
     const privacyReady = !recordConfiguration.enabled || recordConfiguration.encrypted
@@ -406,26 +468,29 @@ export async function registerRoutes(
   app.get("/api/status", async (_req, res) => {
     const demo = isDemoBrain();
     const fishEnabled = Boolean(process.env.FISH_AUDIO_API_KEY);
+    const anthropicAvailable = providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY));
+    const openaiAvailable = providerAvailable("openai", Boolean(process.env.OPENAI_API_KEY));
+    const fishAvailable = providerAvailable("fishAudio", fishEnabled);
     const credit = getFishCredit();
     res.json({
-      mode: !demo ? "live" : fishEnabled ? "fish-live" : "demo",
+      mode: currentMode(demo, fishEnabled),
       credit,
       services: {
         microphone: true,
-        anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
-        openai: Boolean(process.env.OPENAI_API_KEY),
-        fishAudio: fishEnabled,
+        anthropic: anthropicAvailable,
+        openai: openaiAvailable,
+        fishAudio: fishAvailable,
         voice: Boolean(voiceId(DEFAULT_LOCALE)),
       },
       models: {
-        llm: process.env.ANTHROPIC_API_KEY
+        llm: anthropicAvailable
           ? process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
-          : process.env.OPENAI_API_KEY
+          : openaiAvailable
             ? process.env.OPENAI_MODEL || "gpt-5.4-mini"
             : "yerel senaryo motoru",
-        transcription: process.env.OPENAI_API_KEY
+        transcription: openaiAvailable
           ? process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe"
-          : "fish transcribe-1",
+          : fishAvailable ? "fish transcribe-1" : "tarayıcı metin girişi",
         speech: process.env.FISH_AUDIO_MODEL || "s2-pro",
       },
       records: recordsStatus(),
@@ -476,7 +541,7 @@ export async function registerRoutes(
       }
 
       const state = updateCallState(transcript, payload.state, payload.locale);
-      const mode = !demo ? "live" : fishEnabled ? "fish-live" : "demo";
+      const mode = currentMode(demo, fishEnabled);
       res.status(200);
       res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -497,59 +562,62 @@ export async function registerRoutes(
         let closeFish: (() => void) | null = null;
         let flushFish: (() => void) | null = null;
 
-        if (fishEnabled) {
-          const client = new FishAudioClient({ apiKey: process.env.FISH_AUDIO_API_KEY });
-          const connection = await client.textToSpeech.convertRealtime({
-            text: "",
-            reference_id: voiceId(payload.locale),
-            format: "mp3",
-            sample_rate: 44_100,
-            mp3_bitrate: 128,
-            chunk_length: 90,
-            latency: "balanced",
-            normalize: true,
-            temperature: 0.35,
-            top_p: 0.7,
-            prosody: { speed: 1, volume: 0 },
-          }, textQueue, (process.env.FISH_AUDIO_MODEL || "s2-pro") as Backends);
-          closeFish = () => connection.close();
-          requestAbort.signal.addEventListener("abort", closeFish, { once: true });
-          flushFish = () => connection.send(new FlushEvent());
-          finishFish = new Promise((resolve) => {
-            let settled = false;
-            const settle = () => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(timeout);
-              resolve();
-            };
-            const timeout = setTimeout(() => {
-              audioWarning = "Fish Audio streaming zaman aşımına uğradı.";
-              connection.close();
-              settle();
-            }, 45_000);
-            connection.on(RealtimeEvents.AUDIO_CHUNK, (value: unknown) => {
-              const bytes = value instanceof Uint8Array ? value : Buffer.from(value as ArrayBuffer);
-              if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
-              writeStreamEvent(res, {
-                type: "audio",
-                audioBase64: Buffer.from(bytes).toString("base64"),
-                audioMime: "audio/mpeg",
-              });
-            });
-            connection.on(RealtimeEvents.ERROR, (value: unknown) => {
-              audioWarning = value instanceof Error ? value.message : "Fish Audio streaming hatası.";
-              settle();
-            });
-            connection.on(RealtimeEvents.CLOSE, settle);
-          });
-        }
-
         try {
+          if (fishEnabled) {
+            const client = new FishAudioClient({ apiKey: process.env.FISH_AUDIO_API_KEY });
+            const connection = await client.textToSpeech.convertRealtime({
+              text: "",
+              reference_id: voiceId(payload.locale),
+              format: "mp3",
+              sample_rate: 44_100,
+              mp3_bitrate: 128,
+              chunk_length: 90,
+              latency: "balanced",
+              normalize: true,
+              temperature: 0.35,
+              top_p: 0.7,
+              prosody: { speed: 1, volume: 0 },
+            }, textQueue, (process.env.FISH_AUDIO_MODEL || "s2-pro") as Backends);
+            closeFish = () => connection.close();
+            requestAbort.signal.addEventListener("abort", closeFish, { once: true });
+            flushFish = () => connection.send(new FlushEvent());
+            finishFish = new Promise((resolve) => {
+              let settled = false;
+              const settle = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                resolve();
+              };
+              const timeout = setTimeout(() => {
+                audioWarning = fallbackWarnings[payload.locale].voice;
+                connection.close();
+                settle();
+              }, 8_000);
+              connection.on(RealtimeEvents.AUDIO_CHUNK, (value: unknown) => {
+                providerHealth.fishAudio = true;
+                const bytes = value instanceof Uint8Array ? value : Buffer.from(value as ArrayBuffer);
+                if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
+                writeStreamEvent(res, {
+                  type: "audio",
+                  audioBase64: Buffer.from(bytes).toString("base64"),
+                  audioMime: "audio/mpeg",
+                });
+              });
+              connection.on(RealtimeEvents.ERROR, (value: unknown) => {
+                providerFailure("Fish realtime", value, "fishAudio");
+                audioWarning = fallbackWarnings[payload.locale].voice;
+                settle();
+              });
+              connection.on(RealtimeEvents.CLOSE, settle);
+            });
+          }
+
           reply = leadIn;
           writeStreamEvent(res, { type: "text_delta", text: leadIn });
           textQueue.push(leadIn);
-          await textQueue.waitUntilDrained();
+          const leadInDrained = await textQueue.waitUntilDrained();
+          if (!leadInDrained) audioWarning = fallbackWarnings[payload.locale].voice;
           flushFish?.();
           let continuation = "";
           let continuationStarted = false;
@@ -589,10 +657,34 @@ export async function registerRoutes(
           if (!continuationStarted) streamContinuation(cleanStreamingContinuation(continuation, payload.locale));
           textQueue.end();
           if (finishFish) await finishFish;
+          if (fishEnabled && firstAudioMs === null) {
+            const audioBase64 = await synthesizeFish(reply, payload.locale, requestAbort.signal);
+            firstAudioMs = Date.now() - startedAt;
+            writeStreamEvent(res, { type: "audio", audioBase64, audioMime: "audio/mpeg" });
+          }
         } catch (error) {
           textQueue.end();
           closeFish?.();
-          throw error;
+          providerFailure("live turn", error, claudeEnabled ? "anthropic" : "openai");
+          audioWarning = fallbackWarnings[payload.locale].brain;
+          const fallback = demoReply(transcript, payload.history, state, payload.locale);
+          if (!reply.trim()) {
+            reply = fallback;
+            writeStreamEvent(res, { type: "text_delta", text: fallback });
+          } else if (reply.trim() === leadIn.trim()) {
+            reply += fallback;
+            writeStreamEvent(res, { type: "text_delta", text: fallback });
+          }
+          if (fishEnabled && firstAudioMs === null) {
+            try {
+              const audioBase64 = await synthesizeFish(reply, payload.locale, requestAbort.signal);
+              firstAudioMs = Date.now() - startedAt;
+              writeStreamEvent(res, { type: "audio", audioBase64, audioMime: "audio/mpeg" });
+            } catch (fishError) {
+              providerFailure("Fish synthesis", fishError, "fishAudio");
+              audioWarning = `${audioWarning} ${fallbackWarnings[payload.locale].voice}`;
+            }
+          }
         }
       } else {
         reply = !demo && openai
@@ -605,7 +697,8 @@ export async function registerRoutes(
             firstAudioMs = Date.now() - startedAt;
             writeStreamEvent(res, { type: "audio", audioBase64, audioMime: "audio/mpeg" });
           } catch (error) {
-            audioWarning = error instanceof Error ? error.message : "Fish Audio yanıt vermedi.";
+            providerFailure("Fish synthesis", error, "fishAudio");
+            audioWarning = fallbackWarnings[payload.locale].voice;
           }
         }
       }
@@ -684,19 +777,29 @@ export async function registerRoutes(
       }
       const state = updateCallState(transcript, payload.state, payload.locale);
 
-      const reply = !demo && claudeEnabled
-        ? await generateClaudeReply(transcript, payload.history, state, payload.locale, requestAbort.signal)
-        : !demo && openai
-          ? await generateOpenAIReply(openai, transcript, payload.history, state, payload.locale, requestAbort.signal)
-          : demoReply(transcript, payload.history, state, payload.locale);
+      let reply = "";
+      let providerWarning: string | null = null;
+      try {
+        reply = !demo && claudeEnabled
+          ? await generateClaudeReply(transcript, payload.history, state, payload.locale, requestAbort.signal)
+          : !demo && openai
+            ? await generateOpenAIReply(openai, transcript, payload.history, state, payload.locale, requestAbort.signal)
+            : demoReply(transcript, payload.history, state, payload.locale);
+      } catch (error) {
+        providerFailure("live turn", error, claudeEnabled ? "anthropic" : "openai");
+        providerWarning = fallbackWarnings[payload.locale].brain;
+        reply = demoReply(transcript, payload.history, state, payload.locale);
+      }
 
       let audioBase64: string | null = null;
-      let audioWarning: string | null = null;
+      let audioWarning: string | null = providerWarning;
       if (fishEnabled) {
         try {
           audioBase64 = await synthesizeFish(reply, payload.locale, requestAbort.signal);
         } catch (error) {
-          audioWarning = error instanceof Error ? error.message : "Fish Audio yanıt vermedi.";
+          providerFailure("Fish synthesis", error, "fishAudio");
+          const message = fallbackWarnings[payload.locale].voice;
+          audioWarning = audioWarning ? `${audioWarning} ${message}` : message;
         }
       }
 
@@ -722,7 +825,7 @@ export async function registerRoutes(
         reply,
         audioBase64,
         audioMime: audioBase64 ? "audio/mpeg" : null,
-        mode: !demo ? "live" : fishEnabled ? "fish-live" : "demo",
+        mode: currentMode(demo, fishEnabled),
         audioWarning,
         latencyMs: Date.now() - startedAt,
         state,

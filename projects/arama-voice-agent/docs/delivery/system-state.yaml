@@ -1,4 +1,4 @@
-revision: multilingual-v1
+revision: global-voice-operations-v2
 verified_on: 2026-08-13
 implementation:
   locale_count: 10
@@ -12,9 +12,16 @@ verification:
   automated_tests: 18_passed
   production_build: passed
   production_http_smoke: passed
+  production_smoke_checks: 10_passed
   browser_desktop: passed
-  browser_mobile_375px: passed
+  browser_mobile_375px: passed_no_horizontal_overflow
+  browser_dark_theme: passed
+  browser_light_theme: passed
   interactive_locale_scenario: french_appointment_passed
+  invalid_provider_credentials: graceful_local_fallback_passed
+  fish_tts_live: passed_real_mp3_2026-08-13
+  provider_status: runtime_health_verified
+  dependency_audit: 0_known_vulnerabilities_2026-08-13
 release:
   production_allowed: false
   reason: Live provider, legal, secret, retention, and monitoring checks remain environment-specific.

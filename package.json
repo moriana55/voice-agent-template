@@ -1,6 +1,7 @@
 {
   "name": "voice-agent-template",
   "version": "0.1.0",
+  "description": "Multilingual voice-operations prototype with live Fish Audio speech, structured call state, provider fallback, and Twilio workflows.",
   "private": true,
   "type": "module",
   "engines": {

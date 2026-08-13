@@ -21,3 +21,40 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Start isolated production smoke server
+        env:
+          NODE_ENV: production
+          PORT: 5193
+          DEMO_MODE: "true"
+          OPENAI_API_KEY: ""
+          ANTHROPIC_API_KEY: ""
+          FISH_AUDIO_API_KEY: ""
+          ADMIN_API_KEY: smoke-admin
+          DATA_ENCRYPTION_KEY: ci-only-smoke-encryption-key
+          DATA_DIR: ${{ runner.temp }}/arama-smoke-data
+          TWILIO_AUTH_TOKEN: smoke-twilio
+          PUBLIC_BASE_URL: ""
+          ALLOWED_ORIGINS: http://127.0.0.1:5193
+        run: |
+          node dist/index.cjs > "${RUNNER_TEMP}/arama-smoke.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/arama-smoke.pid"
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:5193/api/health/live > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/arama-smoke.log"
+          exit 1
+      - name: Verify production HTTP and Twilio paths
+        env:
+          SMOKE_BASE_URL: http://127.0.0.1:5193
+          SMOKE_ADMIN_KEY: smoke-admin
+          SMOKE_TWILIO_TOKEN: smoke-twilio
+        run: npm run smoke:http
+      - name: Stop smoke server
+        if: always()
+        run: |
+          if test -f "${RUNNER_TEMP}/arama-smoke.pid"; then
+            kill "$(cat "${RUNNER_TEMP}/arama-smoke.pid")" || true
+          fi

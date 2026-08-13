@@ -19,8 +19,8 @@ personality:
   - operational
 visual_language:
   typography: Cabinet Grotesk with Satoshi and a restrained mono layer
-  palette: warm neutral surfaces with orange action and green success accents
-  interaction: one primary voice action with progressive operational detail
+  palette: near-black control-room surfaces with warm orange signal and green success accents; warm editorial light mode
+  interaction: broadcast-console hierarchy, a scanning voice core, one primary voice action, and progressive operational detail
 non_goals:
   - generic chatbot dashboard styling
   - decorative AI gradients
