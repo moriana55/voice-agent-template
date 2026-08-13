@@ -24,6 +24,7 @@ test("tamamlanan çağrıyı şifreli ve tekil olarak kaydeder", async () => {
   const first = await recordCompletedCall({
     callId: "test-call-1",
     source: "web",
+    locale: "tr",
     state,
     transcript: "Telefonum 0532 123 45 67",
     history: [],
@@ -31,6 +32,7 @@ test("tamamlanan çağrıyı şifreli ve tekil olarak kaydeder", async () => {
   const duplicate = await recordCompletedCall({
     callId: "test-call-1",
     source: "web",
+    locale: "tr",
     state,
     transcript: "tekrar",
     history: [],
@@ -42,6 +44,7 @@ test("tamamlanan çağrıyı şifreli ve tekil olarak kaydeder", async () => {
   assert.equal(duplicate.saved, false);
   assert.equal(records.length, 1);
   assert.equal(records[0].phone, "05321234567");
+  assert.equal(records[0].locale, "tr");
   assert.equal(await deleteCallRecord(records[0].id), true);
   assert.deepEqual(await listCallRecords(), []);
 });

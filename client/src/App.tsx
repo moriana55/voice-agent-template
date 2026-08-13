@@ -7,14 +7,24 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { CallState } from "@shared/schema";
+import { localeMetadata, normalizeLocale, supportedLocales, type Locale } from "@shared/i18n";
+import {
+  getCopy,
+  getPresentationScenarios,
+  initialCallState,
+  initialMessages,
+  intentLabels,
+  type Message,
+  type PresentationScenario,
+} from "./i18n";
 
-type Message = { role: "user" | "assistant"; content: string };
 type Status = {
   mode: "demo" | "fish-live" | "live";
   credit: number | null;
   services: Record<"microphone" | "anthropic" | "openai" | "fishAudio" | "voice", boolean>;
   models: { llm: string; transcription: string; speech: string };
   records: { enabled: boolean; encrypted: boolean; crmWebhook: boolean };
+  localization?: { defaultLocale: Locale; supportedLocales: Locale[] };
 };
 type StreamEvent =
   | { type: "meta"; transcript: string; state: CallState; mode: string }
@@ -22,93 +32,11 @@ type StreamEvent =
   | { type: "audio"; audioBase64: string; audioMime: string }
   | { type: "done"; reply: string; latencyMs: number; firstAudioMs: number | null; audioWarning: string | null; recorded: boolean }
   | { type: "error"; message: string };
-type PresentationScenario = {
-  id: "appointment" | "pricing" | "support";
-  label: string;
-  detail: string;
-  prompt: string;
-  reply: string;
-  state: CallState;
-};
 type RunTurnContext = {
   history?: Message[];
   state?: CallState;
   scenario?: PresentationScenario;
 };
-
-const initialMessages: Message[] = [{
-  role: "assistant",
-  content: "Merhaba, ben Arama. Size nasıl yardımcı olabilirim?",
-}];
-const initialCallState: CallState = {
-  intent: "genel",
-  name: null,
-  phone: null,
-  requestedDate: null,
-  requestedTime: null,
-  summary: "Yeni görüşme",
-  missingFields: [],
-  completed: false,
-};
-const intentLabels: Record<CallState["intent"], string> = {
-  genel: "Genel talep",
-  randevu: "Randevu",
-  fiyat: "Fiyat talebi",
-  destek: "Destek kaydı",
-};
-const presentationScenarios: PresentationScenario[] = [
-  {
-    id: "appointment",
-    label: "Randevu oluştur",
-    detail: "Yarın / 15:00",
-    prompt: "Yarın öğleden sonra saat üç için randevu almak istiyorum.",
-    reply: "Elbette, randevunuzu birlikte hemen oluşturalım. Adınızı ve soyadınızı alabilir miyim?",
-    state: {
-      intent: "randevu",
-      name: null,
-      phone: null,
-      requestedDate: "yarın",
-      requestedTime: "15:00",
-      summary: "Randevu talebi — yarın 15:00",
-      missingFields: ["name", "phone"],
-      completed: false,
-    },
-  },
-  {
-    id: "pricing",
-    label: "Fiyat bilgisi",
-    detail: "Web sitesi paketi",
-    prompt: "Yeni bir web sitesi için fiyat bilgisi almak istiyorum.",
-    reply: "Tabii, fiyat bilgisi için hemen yardımcı olayım. Size hitap edebilmem için adınızı alabilir miyim?",
-    state: {
-      intent: "fiyat",
-      name: null,
-      phone: null,
-      requestedDate: null,
-      requestedTime: null,
-      summary: "Web sitesi için fiyat talebi",
-      missingFields: ["name", "phone"],
-      completed: false,
-    },
-  },
-  {
-    id: "support",
-    label: "Teknik destek",
-    detail: "Sistem çalışmıyor",
-    prompt: "Teknik destek almak istiyorum, sistem çalışmıyor.",
-    reply: "Anladım, sorunu birlikte hızlıca kontrol edelim. Destek kaydı için adınızı alabilir miyim?",
-    state: {
-      intent: "destek",
-      name: null,
-      phone: null,
-      requestedDate: null,
-      requestedTime: null,
-      summary: "Sistem çalışmıyor — destek kaydı",
-      missingFields: ["name", "phone"],
-      completed: false,
-    },
-  },
-];
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -116,10 +44,10 @@ function formatDuration(totalSeconds: number) {
   return `${minutes}:${seconds}`;
 }
 
-function speakFallback(text: string) {
+function speakFallback(text: string, locale: Locale) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "tr-TR";
+  utterance.lang = localeMetadata[locale].speech;
   utterance.rate = 1.03;
   window.speechSynthesis.speak(utterance);
 }
@@ -288,15 +216,21 @@ function encodePcmWav(chunks: Float32Array[], inputRate: number, outputRate = 16
 export default function App() {
   const [location, navigate] = useLocation();
   const presentationMode = location === "/present";
+  const [locale, setLocale] = useState<Locale>(() => normalizeLocale(
+    window.localStorage.getItem("arama-locale") || navigator.language,
+    "en",
+  ));
+  const t = getCopy(locale);
+  const scenarios = getPresentationScenarios(locale);
   const [status, setStatus] = useState<Status | null>(null);
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>(() => initialMessages(locale));
   const [text, setText] = useState("");
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
   const [streamingReply, setStreamingReply] = useState("");
   const [error, setError] = useState("");
   const [latency, setLatency] = useState<number | null>(null);
-  const [callState, setCallState] = useState<CallState>(initialCallState);
+  const [callState, setCallState] = useState<CallState>(() => initialCallState(locale));
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [dark, setDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -326,11 +260,16 @@ export default function App() {
     refreshStatus();
   }, []);
 
+  useEffect(() => {
+    document.documentElement.lang = localeMetadata[locale].html;
+    window.localStorage.setItem("arama-locale", locale);
+  }, [locale]);
+
   function refreshStatus() {
     fetch("/api/status").then((response) => response.json()).then(setStatus)
       .catch(() => {
         if (presentationMode) setUsingFallback(true);
-        else setError("Sunucu bağlantısı kurulamadı.");
+        else setError(t.serverUnavailable);
       });
   }
 
@@ -360,6 +299,21 @@ export default function App() {
     else window.localStorage.removeItem("arama-privacy-consent");
   }
 
+  function changeLocale(nextLocale: Locale) {
+    if (nextLocale === locale) return;
+    cancelActiveTurn();
+    setLocale(nextLocale);
+    setMessages(initialMessages(nextLocale));
+    setCallState(initialCallState(nextLocale));
+    setElapsedSeconds(0);
+    setLatency(null);
+    setError("");
+    setActiveScenario(null);
+    setRecordSaved(false);
+    callIdRef.current = crypto.randomUUID();
+    lastInputRef.current = null;
+  }
+
   function cancelActiveTurn() {
     requestAbortRef.current?.abort();
     requestAbortRef.current = null;
@@ -376,7 +330,7 @@ export default function App() {
   ) {
     if (busy) return;
     if (!privacyAccepted) {
-      setError("Devam etmek için veri işleme bilgilendirmesini kabul edin.");
+      setError(t.consentRequired);
       return;
     }
     if (remember) lastInputRef.current = input;
@@ -398,14 +352,15 @@ export default function App() {
       if (input.audio) body.append("audio", input.audio, "recording.wav");
       body.append("callId", callIdRef.current);
       body.append("consent", "true");
+      body.append("locale", locale);
       body.append("history", JSON.stringify(historyAtStart));
       body.append("state", JSON.stringify(stateAtStart));
       const response = await fetch("/api/turn/stream", { method: "POST", body, signal: requestAbort.signal });
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({ message: "Görüşme işlenemedi." }));
-        throw new Error(payload.message || "Görüşme işlenemedi.");
+        const payload = await response.json().catch(() => ({ message: t.requestFailed }));
+        throw new Error(payload.message || t.requestFailed);
       }
-      if (!response.body) throw new Error("Sunucu streaming yanıtı döndürmedi.");
+      if (!response.body) throw new Error(t.streamMissing);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -428,7 +383,7 @@ export default function App() {
           setLatency(event.firstAudioMs ?? event.latencyMs);
           if (event.audioWarning) {
             if (presentationMode) setUsingFallback(true);
-            else setError(`Ses uyarısı: ${event.audioWarning}`);
+            else setError(`${t.audioWarning}: ${event.audioWarning}`);
           }
           if (event.recorded) setRecordSaved(true);
         } else if (event.type === "error") {
@@ -447,11 +402,11 @@ export default function App() {
         if (done) break;
       }
       if (buffer.trim()) handleEvent(JSON.parse(buffer) as StreamEvent);
-      if (!transcript || !reply.trim()) throw new Error("Streaming görüşme tamamlanamadı.");
+      if (!transcript || !reply.trim()) throw new Error(t.streamIncomplete);
 
       player?.finish();
       if (!player?.hasAudio) {
-        speakFallback(reply);
+        speakFallback(reply, locale);
         if (presentationMode) setUsingFallback(true);
       }
       setMessages([
@@ -465,8 +420,8 @@ export default function App() {
       if (reason instanceof DOMException && reason.name === "AbortError") return;
       if (presentationMode && input.text) {
         const scenario = context.scenario
-          ?? presentationScenarios.find((candidate) => candidate.prompt === input.text)
-          ?? presentationScenarios[0];
+          ?? scenarios.find((candidate) => candidate.prompt === input.text)
+          ?? scenarios[0];
         setUsingFallback(true);
         setLatency(120);
         setCallState(scenario.state);
@@ -475,10 +430,10 @@ export default function App() {
           { role: "user", content: input.text },
           { role: "assistant", content: scenario.reply },
         ]);
-        speakFallback(scenario.reply);
+        speakFallback(scenario.reply, locale);
         setError("");
       } else {
-        setError(reason instanceof Error ? reason.message : "Beklenmeyen bir hata oluştu.");
+        setError(reason instanceof Error ? reason.message : t.unexpected);
       }
     } finally {
       if (requestAbortRef.current === requestAbort) requestAbortRef.current = null;
@@ -498,13 +453,13 @@ export default function App() {
   async function startRecording() {
     if (recordingRef.current) return;
     if (!privacyAccepted) {
-      setError("Mikrofonu açmadan önce veri işleme bilgilendirmesini kabul edin.");
+      setError(t.micConsent);
       return;
     }
     if (busy) cancelActiveTurn();
     setError("");
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Bu tarayıcı mikrofon kaydını desteklemiyor.");
+      setError(t.micUnsupported);
       return;
     }
     try {
@@ -559,14 +514,14 @@ export default function App() {
       setRecording(true);
       maxRecordingTimerRef.current = window.setTimeout(() => stopRecording(), 30_000);
     } catch {
-      setError("Mikrofon izni verilmedi. Metin alanıyla demoyu deneyebilirsiniz.");
+      setError(t.micDenied);
     }
   }
 
   function resetCall() {
     cancelActiveTurn();
-    setMessages(initialMessages);
-    setCallState(initialCallState);
+    setMessages(initialMessages(locale));
+    setCallState(initialCallState(locale));
     setElapsedSeconds(0);
     setLatency(null);
     setError("");
@@ -584,7 +539,7 @@ export default function App() {
     void runTurn(
       { text: scenario.prompt },
       true,
-      { history: initialMessages, state: initialCallState, scenario },
+      { history: initialMessages(locale), state: initialCallState(locale), scenario },
     );
   }
 
@@ -594,21 +549,21 @@ export default function App() {
 
   function exportSummary() {
     const lines = [
-      "ARAMA — Görüşme Özeti",
-      `Süre: ${formatDuration(elapsedSeconds)}`,
-      `Niyet: ${intentLabels[callState.intent]}`,
-      `İsim: ${callState.name || "Alınmadı"}`,
-      `Telefon: ${callState.phone || "Alınmadı"}`,
-      `Tarih: ${callState.requestedDate || "Alınmadı"}`,
-      `Saat: ${callState.requestedTime || "Alınmadı"}`,
-      `Özet: ${callState.summary}`,
+      t.summaryTitle,
+      `${t.duration}: ${formatDuration(elapsedSeconds)}`,
+      `${t.intent}: ${intentLabels[locale][callState.intent]}`,
+      `${t.name}: ${callState.name || t.notProvided}`,
+      `${t.phone}: ${callState.phone || t.notProvided}`,
+      `${t.date}: ${callState.requestedDate || t.notProvided}`,
+      `${t.time}: ${callState.requestedTime || t.notProvided}`,
+      `${t.summary}: ${callState.summary}`,
       "",
-      ...messages.map((message) => `${message.role === "assistant" ? "Arama" : "Müşteri"}: ${message.content}`),
+      ...messages.map((message) => `${message.role === "assistant" ? "Arama" : t.customer}: ${message.content}`),
     ];
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `arama-gorusme-${Date.now()}.txt`;
+    anchor.download = `arama-call-${locale}-${Date.now()}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -639,36 +594,36 @@ export default function App() {
     if (audio && audio.size > 500) {
       void runTurn({ audio });
     } else {
-      setError("Kayıt çok kısa kaldı. Biraz daha uzun konuşup tekrar deneyin.");
+      setError(t.recordingShort);
     }
   }
 
   const serviceRows = [
-    ["Mikrofon", status?.services.microphone, "Tarayıcı"],
-    ["Dinleme", Boolean(status?.services.openai || status?.services.fishAudio), status?.models.transcription || "—"],
-    ["Zekâ", Boolean(status?.services.anthropic || status?.services.openai), status?.models.llm || "—"],
-    ["Konuşma", status?.services.fishAudio, status?.models.speech || "—"],
+    [t.microphone, status?.services.microphone, t.browser],
+    [t.listening, Boolean(status?.services.openai || status?.services.fishAudio), status?.models.transcription || "—"],
+    [t.intelligence, Boolean(status?.services.anthropic || status?.services.openai), status?.models.llm || "—"],
+    [t.speech, status?.services.fishAudio, status?.models.speech || "—"],
   ] as const;
   const callFields = [
-    ["İsim", callState.name],
-    ["Telefon", callState.phone],
-    ["Tarih", callState.requestedDate],
-    ["Saat", callState.requestedTime],
+    [t.name, callState.name],
+    [t.phone, callState.phone],
+    [t.date, callState.requestedDate],
+    [t.time, callState.requestedTime],
   ] as const;
   const presentationStatus = usingFallback
-    ? "SUNUM YEDEĞİ"
+    ? t.presentationFallback
     : status?.mode === "live"
-      ? "SUNUM CANLI"
-      : "SUNUM HAZIR";
+      ? t.presentationLive
+      : t.presentationReady;
 
   return (
     <>
       <button className="skip-link" type="button" data-testid="button-skip-content"
-        onClick={() => document.getElementById("main")?.scrollIntoView({ behavior: "smooth" })}>İçeriğe geç</button>
+        onClick={() => document.getElementById("main")?.scrollIntoView({ behavior: "smooth" })}>{t.skip}</button>
       <div className={`app-shell ${presentationMode ? "presentation-mode" : ""}`}>
         <header className="topbar">
-          <Link className="brand" href="/" aria-label="Arama ana sayfa" data-testid="link-home">
-            <svg viewBox="0 0 40 40" role="img" aria-label="Arama logosu">
+          <Link className="brand" href="/" aria-label={t.home} data-testid="link-home">
+            <svg viewBox="0 0 40 40" role="img" aria-label="Arama">
               <path d="M9 20c0-8 4-12 11-12s11 4 11 12-4 12-11 12" />
               <path d="M14 16v8M20 13v14M26 16v8" />
             </svg>
@@ -676,24 +631,33 @@ export default function App() {
           </Link>
           <div className="topbar-actions">
             <span className="call-timer" data-testid="text-call-duration">{formatDuration(elapsedSeconds)}</span>
+            <label className="language-picker">
+              <span className="sr-only">Language</span>
+              <select value={locale} onChange={(event) => changeLocale(event.target.value as Locale)}
+                data-testid="select-language" disabled={recording || busy}>
+                {supportedLocales.map((option) => (
+                  <option key={option} value={option}>{localeMetadata[option].label}</option>
+                ))}
+              </select>
+            </label>
             <button className={`presentation-toggle ${presentationMode ? "active" : ""}`} type="button"
               data-testid="button-presentation-mode"
               onClick={() => navigate(presentationMode ? "/" : "/present")}
               aria-pressed={presentationMode}>
-              <MonitorPlay size={18} /><span>{presentationMode ? "Sunumdan çık" : "Sunum modu"}</span>
+              <MonitorPlay size={18} /><span>{presentationMode ? t.exitPresentation : t.presentationMode}</span>
             </button>
             <button className="icon-button" type="button" data-testid="button-reset-call"
-              aria-label="Yeni görüşme başlat" title="Yeni görüşme" onClick={resetCall} disabled={recording}>
+              aria-label={t.newCall} title={t.newCall} onClick={resetCall} disabled={recording}>
               <RotateCcw size={18} />
             </button>
             <span className={`mode-pill ${status?.mode !== "demo" && !usingFallback ? "live" : ""}`} data-testid="status-mode">
               <span />{presentationMode
                 ? presentationStatus
-                : status?.mode === "live" ? "TAM CANLI" : status?.mode === "fish-live" ? "FISH CANLI" : "DEMO MODU"}
+                : status?.mode === "live" ? t.liveFull : status?.mode === "fish-live" ? t.liveFish : t.demoMode}
             </span>
             <button className="icon-button" type="button"
               data-testid="button-theme"
-              aria-label={dark ? "Açık temaya geç" : "Koyu temaya geç"}
+              aria-label={dark ? t.lightTheme : t.darkTheme}
               onClick={() => setDark((value) => !value)}>
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -703,25 +667,25 @@ export default function App() {
         <main id="main" className="workspace">
           <section className={`call-stage ${presentationMode ? "presentation-stage" : ""}`} aria-labelledby="call-title">
             <div className="stage-header">
-              <div><p className="eyebrow">{presentationMode ? "CANLI DEMO / SESLİ AI" : "ÇAĞRI PROTOTİPİ / 01"}</p>
-                <h1 id="call-title">{presentationMode ? "Konuşan müşteri temsilcisi" : "Türkçe çağrı elemanı"}</h1></div>
+              <div><p className="eyebrow">{presentationMode ? t.presentationEyebrow : t.prototypeEyebrow}</p>
+                <h1 id="call-title">{presentationMode ? t.presentationTitle : t.title}</h1></div>
               <div className={`call-meta ${presentationMode ? "latency-meta" : ""}`}>
-                <span>{presentationMode ? "İLK SES" : "FISH BAKİYE"}</span>
+                <span>{presentationMode ? t.firstAudio : t.fishCredit}</span>
                 <strong data-testid={presentationMode ? "text-first-audio" : "text-credit"}>
                   {presentationMode
-                    ? latency ? `${(latency / 1000).toFixed(2)} sn` : "Ölçülüyor"
+                    ? latency ? `${(latency / 1000).toFixed(2)} s` : t.measuring
                     : status?.credit != null ? `$${status.credit.toFixed(4)}` : "—"}
                 </strong>
-                <small>{presentationMode ? usingFallback ? "güvenli yedek" : "canlı ölçüm" : latency ? `ilk ses ${(latency / 1000).toFixed(1)} sn` : "hazır"}</small>
+                <small>{presentationMode ? usingFallback ? t.safeFallback : t.liveMeasurement : latency ? `${t.firstAudio.toLocaleLowerCase()} ${(latency / 1000).toFixed(1)} s` : t.ready}</small>
               </div>
             </div>
             {presentationMode && <section className="presentation-console" aria-labelledby="presentation-scenarios-title">
               <div className="presentation-copy">
-                <p className="eyebrow">TEK TIK SENARYOLAR</p>
-                <h2 id="presentation-scenarios-title">Bir müşteri cümlesi seç; sistem konuşsun ve kaydı doldursun.</h2>
+                <p className="eyebrow">{t.scenariosEyebrow}</p>
+                <h2 id="presentation-scenarios-title">{t.scenariosTitle}</h2>
               </div>
               <div className="scenario-list">
-                {presentationScenarios.map((scenario) => {
+                {scenarios.map((scenario) => {
                   const Icon = scenario.id === "appointment" ? CalendarClock : scenario.id === "pricing" ? BadgeDollarSign : Wrench;
                   return <button key={scenario.id} type="button"
                     className={`scenario-button ${scenario.id === "appointment" ? "featured" : ""} ${activeScenario === scenario.id ? "active" : ""}`}
@@ -733,53 +697,53 @@ export default function App() {
                   </button>;
                 })}
               </div>
-              <div className="presentation-flow" aria-label="Canlı ses zinciri">
-                <span><Mic size={16} />Dinle</span><ArrowRight size={14} />
-                <span><Bot size={16} />Anla</span><ArrowRight size={14} />
-                <span><AudioLines size={16} />Konuş</span>
+              <div className="presentation-flow" aria-label={t.voiceFlow}>
+                <span><Mic size={16} />{t.listen}</span><ArrowRight size={14} />
+                <span><Bot size={16} />{t.understand}</span><ArrowRight size={14} />
+                <span><AudioLines size={16} />{t.speak}</span>
               </div>
-              <p className="presentation-safety"><ShieldCheck size={16} />Canlı servis kesilirse görüşme yerel sunum yedeğiyle devam eder.</p>
+              <p className="presentation-safety"><ShieldCheck size={16} />{t.presentationSafety}</p>
             </section>}
             <div className={`voice-orbit ${recording ? "recording" : ""} ${busy ? "thinking" : ""}`}>
               <div className="orbit-line orbit-one" /><div className="orbit-line orbit-two" />
               <div className="voice-core">
                 {recording ? <Waves size={44} /> : busy ? <AudioLines size={44} /> : <Headphones size={44} />}
               </div>
-              <span className="orbit-label label-top">MÜŞTERİ</span>
+              <span className="orbit-label label-top">{t.customerOrbit}</span>
               <span className="orbit-label label-right">FISH S2 PRO</span>
-              <span className="orbit-label label-bottom">{status?.services.anthropic ? "CLAUDE" : status?.services.openai ? "OPENAI" : "KURAL MOTORU"}</span>
+              <span className="orbit-label label-bottom">{status?.services.anthropic ? "CLAUDE" : status?.services.openai ? "OPENAI" : t.rulesEngine}</span>
             </div>
             <div className="primary-control">
               <button className={`talk-button ${recording ? "recording" : ""}`} type="button"
                 data-testid="button-record"
                 onClick={recording ? stopRecording : startRecording} disabled={!privacyAccepted}>
                 {recording ? <CircleStop size={21} /> : <Mic size={21} />}
-                {recording ? "Kaydı bitir" : busy ? "Sözü kes ve konuş" : "Konuşmaya başla"}
+                {recording ? t.stopRecording : busy ? t.interruptAndSpeak : t.startSpeaking}
               </button>
               <p>{recording
-                ? "Konuşmanızı dinliyorum; sustuğunuzda otomatik göndereceğim."
+                ? t.recordingHelp
                 : presentationMode
-                  ? "Hazır senaryoyu seçin veya mikrofondan canlı konuşun."
+                  ? t.presentationHelp
                   : busy
-                    ? "Mikrofona basarak yanıtı kesebilirsiniz."
-                    : "Basın ve konuşun; sessizlikte kayıt otomatik tamamlanır."}</p>
+                    ? t.interruptHelp
+                    : t.idleHelp}</p>
               <label className="consent-control">
                 <input type="checkbox" checked={privacyAccepted}
                   onChange={(event) => setConsent(event.target.checked)} />
-                <span><strong>Bilgilendirildim ve kabul ediyorum.</strong> Ses/metin, yanıt üretmek için yapılandırılmış AI servislerine gönderilir; tamamlanan talep güvenli çağrı kaydına alınır.</span>
+                <span><strong>{t.consentStrong}</strong> {t.consentText}</span>
               </label>
             </div>
           </section>
 
-          <aside className="side-panel" aria-label="Bağlantılar ve görüşme">
+          <aside className="side-panel" aria-label={`${t.connections} / ${t.conversation}`}>
             <section className="connections" aria-labelledby="connections-title">
-              <div className="panel-title"><div><p className="eyebrow">SİSTEM DURUMU</p>
-                <h2 id="connections-title">{presentationMode ? "Canlı zincir" : "Bağlantılar"}</h2></div><PhoneCall size={19} /></div>
+              <div className="panel-title"><div><p className="eyebrow">{t.systemStatus}</p>
+                <h2 id="connections-title">{presentationMode ? t.livePipeline : t.connections}</h2></div><PhoneCall size={19} /></div>
               <div className="service-list">
                 {(presentationMode ? [
-                  ["Dinleme", Boolean(status?.services.openai || status?.services.fishAudio), "Müşteriyi yazıya çevirir"],
-                  ["Karar", Boolean(status?.services.anthropic || status?.services.openai), "Talebi ve eksik bilgiyi anlar"],
-                  ["Ses", Boolean(status?.services.fishAudio), "Yanıtı seçilen sesle akıtır"],
+                  [t.listening, Boolean(status?.services.openai || status?.services.fishAudio), t.transcribesCustomer],
+                  [t.decision, Boolean(status?.services.anthropic || status?.services.openai), t.understandsRequest],
+                  [t.voice, Boolean(status?.services.fishAudio), t.streamsVoice],
                 ] as const : serviceRows).map(([label, connected, model], index) => (
                   <div className="service-row" key={label}>
                     <span className="service-index">0{index + 1}</span>
@@ -792,31 +756,31 @@ export default function App() {
               </div>
               {presentationMode && <p className={`notice ${usingFallback ? "fallback-notice" : ""}`} data-testid="status-notice">
                 {usingFallback
-                  ? "Güvenli sunum yedeği devrede; akış kesilmeden devam ediyor."
+                  ? t.fallbackActive
                   : busy
-                    ? "Müşteri talebi işleniyor; yanıt canlı olarak akıyor."
+                    ? t.processing
                     : activeScenario
-                      ? "Canlı görüşme tamamlandı; çağrı kaydı güncellendi."
-                      : "Canlı servisler hazır. Bir senaryo seçerek demoyu başlatın."}
+                      ? t.completedNotice
+                      : t.chooseScenario}
               </p>}
               {!presentationMode && status?.mode === "fish-live" && <p className="notice" data-testid="status-notice">
-                Dinleme ve Türkçe ses Fish üzerinden canlı. Claude veya OpenAI anahtarı eklenince serbest konuşma açılır.
+                {t.fishNotice}
               </p>}
               {!presentationMode && status?.mode === "demo" && <p className="notice" data-testid="status-notice">
-                Fish ve Claude anahtarları eklenince servisler canlıya geçer.
+                {t.demoNotice}
               </p>}
             </section>
 
             <section className="transcript" aria-labelledby="transcript-title">
-              <div className="panel-title compact"><div><p className="eyebrow">CANLI DÖKÜM</p>
-                <h2 id="transcript-title">Görüşme</h2></div><span>{Math.floor((messages.length - 1) / 2)} TUR</span></div>
+              <div className="panel-title compact"><div><p className="eyebrow">{t.transcriptEyebrow}</p>
+                <h2 id="transcript-title">{t.conversation}</h2></div><span>{Math.floor((messages.length - 1) / 2)} {t.turns}</span></div>
               <div className="message-list" aria-live="polite">
                 {messages.map((message, index) => (
                   <article className={`message ${message.role}`} key={`${message.role}-${index}`}>
                     <div className="avatar" aria-hidden="true">
                       {message.role === "assistant" ? <Bot size={16} /> : <UserRound size={16} />}
                     </div>
-                    <div><strong>{message.role === "assistant" ? "Arama" : "Siz"}</strong>
+                    <div><strong>{message.role === "assistant" ? "Arama" : t.you}</strong>
                       <p>{message.content}</p></div>
                   </article>
                 ))}
@@ -827,10 +791,10 @@ export default function App() {
                 <div ref={endRef} />
               </div>
               <form className="text-input" onSubmit={submitText}>
-                <label htmlFor="message">Metinle dene</label>
+                <label htmlFor="message">{t.tryText}</label>
                 <div><input id="message" data-testid="input-message" value={text} onChange={(event) => setText(event.target.value)}
-                  placeholder="Örn. Yarın için randevu istiyorum" disabled={busy || !privacyAccepted} />
-                  <button type="submit" data-testid="button-send" aria-label="Mesajı gönder" disabled={busy || !privacyAccepted || !text.trim()}>
+                  placeholder={t.inputPlaceholder} disabled={busy || !privacyAccepted} />
+                  <button type="submit" data-testid="button-send" aria-label={t.sendMessage} disabled={busy || !privacyAccepted || !text.trim()}>
                     <Send size={17} /></button></div>
               </form>
               {error && !presentationMode && <p className="error-message" role="alert">{error}</p>}
@@ -838,23 +802,23 @@ export default function App() {
 
             <section className="call-record" aria-labelledby="call-record-title">
               <div className="panel-title compact">
-                <div><p className="eyebrow">CANLI ÇAĞRI KAYDI</p>
-                  <h2 id="call-record-title">{intentLabels[callState.intent]}</h2></div>
+                <div><p className="eyebrow">{t.recordEyebrow}</p>
+                  <h2 id="call-record-title">{intentLabels[locale][callState.intent]}</h2></div>
                 <span className={callState.completed ? "record-complete" : ""}>
-                  {recordSaved ? "KAYDEDİLDİ" : callState.completed ? "TAMAM" : "AKTİF"}
+                  {recordSaved ? t.saved : callState.completed ? t.complete : t.active}
                 </span>
               </div>
               <p className="record-summary" data-testid="text-call-summary">{callState.summary}</p>
               <dl className="record-grid">
                 {callFields.map(([label, value]) => (
-                  <div key={label}><dt>{label}</dt><dd>{value || "Bekleniyor"}</dd></div>
+                  <div key={label}><dt>{label}</dt><dd>{value || t.waiting}</dd></div>
                 ))}
               </dl>
               <div className="record-actions">
                 <button type="button" data-testid="button-retry-turn" onClick={retryLastTurn}
-                  disabled={busy || !privacyAccepted || !lastInputRef.current}><RefreshCw size={16} />Tekrar dene</button>
+                  disabled={busy || !privacyAccepted || !lastInputRef.current}><RefreshCw size={16} />{t.retry}</button>
                 <button type="button" data-testid="button-export-summary" onClick={exportSummary}>
-                  <Download size={16} />Özeti indir</button>
+                  <Download size={16} />{t.export}</button>
               </div>
             </section>
           </aside>

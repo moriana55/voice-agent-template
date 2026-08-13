@@ -30,3 +30,35 @@ test("genel görüşmeyi yanlışlıkla tamamlanmış saymaz", () => {
   assert.equal(state.intent, "genel");
   assert.equal(state.completed, false);
 });
+
+const multilingualAppointments = [
+  ["en", "I need an appointment tomorrow at 3 pm", "tomorrow", "15:00"],
+  ["es", "Quiero una cita mañana a las 15:00", "mañana", "15:00"],
+  ["de", "Ich brauche morgen um 15:00 einen Termin", "morgen", "15:00"],
+  ["fr", "Je souhaite un rendez-vous demain à 15:00", "demain", "15:00"],
+  ["it", "Vorrei un appuntamento domani alle 15:00", "domani", "15:00"],
+  ["pt", "Quero um agendamento amanhã às 15:00", "amanhã", "15:00"],
+  ["nl", "Ik wil morgen om 15:00 een afspraak", "morgen", "15:00"],
+  ["pl", "Chcę umówić wizytę jutro o 15:00", "jutro", "15:00"],
+  ["ru", "Я хочу записаться завтра в 15:00", "завтра", "15:00"],
+] as const;
+
+for (const [locale, phrase, date, time] of multilingualAppointments) {
+  test(`${locale} randevu niyetini, tarihi ve saati çıkarır`, () => {
+    const state = updateCallState(phrase, undefined, locale);
+    assert.equal(state.intent, "randevu");
+    assert.equal(state.requestedDate, date);
+    assert.equal(state.requestedTime, time);
+    assert.deepEqual(state.missingFields, ["name", "phone"]);
+  });
+}
+
+test("İngilizce görüşmede isim ve uluslararası telefon numarasını tamamlar", () => {
+  const first = updateCallState("I need pricing", undefined, "en");
+  const named = updateCallState("My name is Jane Miller", first, "en");
+  const completed = updateCallState("My number is +1 612 555 0199", named, "en");
+  assert.equal(completed.name, "Jane Miller");
+  assert.equal(completed.phone, "+16125550199");
+  assert.equal(completed.completed, true);
+  assert.match(demoReply("My number is +1 612 555 0199", [], completed, "en"), /everything/i);
+});

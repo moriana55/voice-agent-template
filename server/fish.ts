@@ -1,3 +1,5 @@
+import type { Locale } from "@shared/i18n";
+import { DEFAULT_LOCALE, voiceId } from "./dil.js";
 function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
   const timeout = AbortSignal.timeout(timeoutMs);
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -5,10 +7,10 @@ function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
 
 export async function synthesizeFishBuffer(
   text: string,
-  options: { signal?: AbortSignal; phoneOptimized?: boolean } = {},
+  options: { signal?: AbortSignal; phoneOptimized?: boolean; locale?: Locale } = {},
 ) {
   if (!process.env.FISH_AUDIO_API_KEY) throw new Error("Fish Audio yapılandırılmamış.");
-  const referenceId = process.env.FISH_AUDIO_REFERENCE_ID;
+  const referenceId = voiceId(options.locale || DEFAULT_LOCALE);
   const response = await fetch("https://api.fish.audio/v1/tts", {
     method: "POST",
     headers: {

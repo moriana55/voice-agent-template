@@ -1,0 +1,13 @@
+assets:
+  - id: arama-mark
+    kind: inline-svg
+    source: client/src/App.tsx
+    status: existing
+  - id: product-interface
+    kind: responsive-web-ui
+    source: client/src/App.tsx
+    status: revised
+external_media: []
+notes:
+  - No third-party photography or copied reference assets are used.
+  - Product proof is the functioning interface and its verified workflows.

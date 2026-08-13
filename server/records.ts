@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID }
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { CallState, ConversationMessage } from "@shared/schema";
+import type { Locale } from "@shared/i18n";
 
 export type CallSource = "web" | "twilio";
 
@@ -9,6 +10,7 @@ export type CallRecord = {
   id: string;
   callId: string;
   source: CallSource;
+  locale: Locale;
   createdAt: string;
   intent: CallState["intent"];
   name: string | null;
@@ -57,7 +59,7 @@ function encodeRecord(record: CallRecord): string {
 
 function decodeRecord(line: string): CallRecord {
   const parsed = JSON.parse(line) as CallRecord | EncryptedRecord;
-  if (!("encrypted" in parsed)) return parsed;
+  if (!("encrypted" in parsed)) return { ...parsed, locale: parsed.locale || "tr" };
   const key = encryptionKey();
   if (!key) throw new Error("Şifreli kayıtlar için DATA_ENCRYPTION_KEY gerekli.");
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(parsed.iv, "base64"));
@@ -66,7 +68,8 @@ function decodeRecord(line: string): CallRecord {
     decipher.update(Buffer.from(parsed.payload, "base64")),
     decipher.final(),
   ]).toString("utf8");
-  return JSON.parse(payload) as CallRecord;
+  const record = JSON.parse(payload) as CallRecord;
+  return { ...record, locale: record.locale || "tr" };
 }
 
 async function ensureDataDirectory() {
@@ -101,6 +104,7 @@ async function forwardIntegrations(record: CallRecord) {
         id: record.id,
         callId: record.callId,
         createdAt: record.createdAt,
+        locale: record.locale,
         title: `${record.name || "Müşteri"} - Randevu talebi`,
         name: record.name,
         phone: record.phone,
@@ -128,6 +132,7 @@ export function recordsStatus() {
 export async function recordCompletedCall(input: {
   callId: string;
   source: CallSource;
+  locale?: Locale;
   state: CallState;
   transcript: string;
   history: ConversationMessage[];
@@ -139,6 +144,7 @@ export async function recordCompletedCall(input: {
     id: randomUUID(),
     callId: input.callId,
     source: input.source,
+    locale: input.locale || "tr",
     createdAt: new Date().toISOString(),
     intent: input.state.intent,
     name: input.state.name,

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Arama — Sesli Çağrı Elemanı</title>
+<style>
+  @page { size: A4; margin: 13mm 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+         color: #1a1a1a; margin: 0; font-size: 10pt; line-height: 1.5;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sayfa { page-break-after: always; }
+  .sayfa:last-child { page-break-after: auto; }
+
+  h1 { font-size: 25pt; line-height: 1.14; margin: 0 0 8px; letter-spacing: -0.5px; }
+  h2 { font-size: 14.5pt; margin: 0 0 5px; letter-spacing: -0.2px; }
+  h3 { font-size: 11pt; margin: 15px 0 4px; }
+  p  { margin: 0 0 9px; }
+  .ust { font-size: 7.5pt; font-weight: 700; letter-spacing: 2px; color: #c2632a; text-transform: uppercase; margin-bottom: 9px; }
+  .gri { color: #6b6560; }
+  .kucuk { font-size: 8.8pt; }
+
+  .kapak { padding-top: 40mm; }
+  .kapak .alt { margin-top: 24mm; font-size: 9pt; color:#6b6560; border-top:1px solid #e5e0da; padding-top:9px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 9px 0 13px; font-size: 9.4pt; }
+  th { text-align: left; font-size: 7.5pt; text-transform: uppercase; letter-spacing: .7px;
+       color: #6b6560; border-bottom: 1.5px solid #d6cfc6; padding: 5px 7px 4px; font-weight: 700; }
+  td { padding: 6px 7px; border-bottom: 1px solid #efebe5; vertical-align: top; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .kutular { display: flex; gap: 8px; margin: 12px 0 15px; }
+  .kutu { flex: 1; border: 1px solid #e5e0da; border-radius: 8px; padding: 11px 12px; background:#fdfcfa; }
+  .kutu .buyuk { font-size: 21pt; font-weight: 700; letter-spacing: -0.5px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .kutu .etiket { font-size: 7.3pt; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color:#57534e; margin-top: 5px; }
+  .kutu .not { font-size: 7.9pt; color: #a8a29e; margin-top: 2px; }
+
+  figure { margin: 0 0 6px; }
+  img { width: 100%; border: 1px solid #e5e0da; border-radius: 7px; display: block; }
+  figcaption { font-size: 8.2pt; color: #6b6560; margin-top: 5px; }
+
+  .vurgu { border-left: 3px solid #c2632a; background: #fdf6f1; padding: 9px 13px; margin: 11px 0 13px; }
+  .uyari { border-left: 3px solid #b45309; background: #fffbf3; padding: 9px 13px; margin: 11px 0 13px; }
+  ul { margin: 0 0 10px; padding-left: 17px; }
+  li { margin-bottom: 4px; }
+
+  .konusma { border:1px solid #e5e0da; border-radius:8px; padding:11px 13px; margin:9px 0 12px; background:#fdfcfa; }
+  .sat { margin-bottom:7px; }
+  .kim { font-size:7.5pt; font-weight:700; letter-spacing:.9px; text-transform:uppercase; color:#a8a29e; }
+  .soz { font-size:9.6pt; }
+</style>
+</head>
+<body>
+
+<!-- KAPAK -->
+<section class="sayfa kapak">
+  <div class="ust">NocturnDev · Ürün Denemesi</div>
+  <h1>Arama — Türkçe konuşan<br>sesli çağrı elemanı</h1>
+  <p class="gri" style="font-size:11.5pt; max-width:150mm; margin-top:13px;">
+    Telefonu açan, Türkçe konuşan, müşteriyi dinleyip adını, telefonunu ve randevu
+    saatini kaydeden bir yapay zekâ elemanı. Çalışan prototip hazır; ölçümler bu
+    raporda gerçek görüşmelerden alınmıştır.
+  </p>
+
+  <div class="kutular" style="margin-top:16mm;">
+    <div class="kutu"><div class="buyuk">1,0 sn</div><div class="etiket">İlk ses</div><div class="not">konuşmaya başlama süresi</div></div>
+    <div class="kutu"><div class="buyuk">3,2 sn</div><div class="etiket">Tam cevap</div><div class="not">ortalama</div></div>
+    <div class="kutu"><div class="buyuk">7/24</div><div class="etiket">Çalışma</div><div class="not">mola yok, meşgul yok</div></div>
+  </div>
+
+  <div class="alt">
+    Hazırlayan: NocturnDev · 3 Ağustos 2026<br>
+    Ölçümler yerel sunucuda, gerçek Claude ve Fish Audio servisleriyle yapılmıştır.
+  </div>
+</section>
+
+<!-- 1. NE YAPIYOR -->
+<section class="sayfa">
+  <div class="ust">01 · Ne yapıyor</div>
+  <h2>Telefonu açıyor, konuşuyor, bilgiyi kaydediyor</h2>
+  <p>
+    Sistem bir çağrı elemanının yaptığı işi yapıyor: karşılıyor, soruyu anlıyor, cevap
+    veriyor ve konuşmanın sonunda <b>işe yarar bilgiyi forma dönüştürüyor</b> — isim,
+    telefon, ne istediği, ne zaman aranmak istediği.
+  </p>
+
+  <table>
+    <tr><th>Adım</th><th>Ne oluyor</th><th>Süre</th></tr>
+    <tr><td><b>1. Dinleme</b></td><td>Müşteri konuşurken sessizlik algılanıyor, kayıt otomatik gönderiliyor. Müşteri araya girerse sistem susuyor.</td><td>—</td></tr>
+    <tr><td><b>2. Anlama</b></td><td>Ses yazıya çevriliyor (Fish Audio transcribe-1).</td><td>anlık</td></tr>
+    <tr><td><b>3. Cevap üretme</b></td><td>Claude cevabı üretiyor; görüşme durumu (isim/telefon/randevu alındı mı) sürekli güncelleniyor.</td><td>~5 ms ilk kelime</td></tr>
+    <tr><td><b>4. Konuşma</b></td><td>Fish Audio S2 Pro sesi parça parça üretiyor; tamamı beklenmeden çalmaya başlıyor.</td><td><b>~1,0 sn</b></td></tr>
+    <tr><td><b>5. Kayıt</b></td><td>Tamamlanan talep kalıcı kayda yazılıyor, CRM ve takvime gönderilebiliyor.</td><td>—</td></tr>
+  </table>
+
+  <div class="vurgu">
+    <b>Neden “ilk ses” önemli:</b> telefonda sessizlik en rahatsız edici şeydir. Sistem
+    cevabın tamamını beklemiyor — ilk hecesi hazır olur olmaz konuşmaya başlıyor.
+    Ölçülen <b>1,0 saniye</b>, insanın nefes alıp cevap vermesiyle aynı aralıkta.
+  </div>
+
+  <figure>
+    <img src="/tmp/ses-present.png">
+    <figcaption>Sunum ekranı — canlı görüşme dökümü ve o an dolan çağrı kaydı</figcaption>
+  </figure>
+</section>
+
+<!-- 2. ÖLÇÜM -->
+<section class="sayfa">
+  <div class="ust">02 · Gerçek ölçüm</div>
+  <h2>Üç görüşme, gerçek servislerle</h2>
+  <p>
+    Aşağıdaki üç tur, demo modunda değil <b>canlı Claude ve Fish Audio bağlantısıyla</b>
+    yapıldı. Süreler sunucunun kendi ölçümü.
+  </p>
+
+  <table>
+    <tr><th>Müşteri ne dedi</th><th class="n">İlk yazı</th><th class="n">İlk ses</th><th class="n">Tam cevap</th></tr>
+    <tr><td>“Merhaba, arsa almak istiyorum, nasıl yardımcı olabilirsiniz?”</td><td class="n">15 ms</td><td class="n"><b>1.040 ms</b></td><td class="n">3.768 ms</td></tr>
+    <tr><td>“Taksitle alabilir miyim, peşinat ne kadar?”</td><td class="n">5 ms</td><td class="n"><b>1.019 ms</b></td><td class="n">2.817 ms</td></tr>
+    <tr><td>“Adım Yiğit, telefonum 0532 111 22 33, beni arayın.”</td><td class="n">6 ms</td><td class="n"><b>1.006 ms</b></td><td class="n">3.122 ms</td></tr>
+    <tr><td><b>Ortalama</b></td><td class="n">9 ms</td><td class="n"><b>1.022 ms</b></td><td class="n">3.236 ms</td></tr>
+  </table>
+
+  <h3>Görüşme nasıl ilerliyor</h3>
+  <p class="kucuk gri" style="margin-bottom:6px;">Üçüncü turda sistem, verilen bilgiyi tanıyıp doğrudan randevuya geçiyor:</p>
+
+  <div class="konusma">
+    <div class="sat"><div class="kim">Müşteri</div><div class="soz">Merhaba, arsa almak istiyorum, nasıl yardımcı olabilirsiniz?</div></div>
+    <div class="sat"><div class="kim">Arama</div><div class="soz">Tabii, sizi dinliyorum; hemen yardımcı olayım. Arsa satışı konusunda yardımcı olmaktan mutluyum, sizinle iletişime geçebilmek için adınızı alabilir miyim?</div></div>
+    <div class="sat"><div class="kim">Müşteri</div><div class="soz">Adım Yiğit, telefonum 0532 111 22 33, beni arayın.</div></div>
+    <div class="sat"><div class="kim">Arama</div><div class="soz">Yiğit Bey, hangi gün ve saatte arayalım sizi?</div></div>
+  </div>
+
+  <p>
+    Dikkat edilecek nokta: sistem <b>lafı uzatmıyor</b>. Eksik bilgiyi tek tek istiyor,
+    bilgi verilince tekrar sormuyor ve doğrudan randevuya götürüyor. Amaç sohbet etmek
+    değil, <b>aranabilir bir kayıt oluşturmak</b>.
+  </p>
+
+  <div class="kutular">
+    <div class="kutu"><div class="buyuk">16</div><div class="etiket">Ses parçası</div><div class="not">tek cevapta, akış hâlinde</div></div>
+    <div class="kutu"><div class="buyuk">170 KB</div><div class="etiket">Üretilen ses</div><div class="not">cevap başına ortalama</div></div>
+    <div class="kutu"><div class="buyuk">$4,92</div><div class="etiket">Kalan Fish bakiyesi</div><div class="not">deneme sonrası</div></div>
+  </div>
+</section>
+
+<!-- 3. NE TOPLUYOR + ALTYAPI -->
+<section class="sayfa">
+  <div class="ust">03 · Ne işe yarıyor</div>
+  <h2>Konuşmadan çıkan şey: doldurulmuş bir talep formu</h2>
+  <p>
+    Görüşme bittiğinde ortaya bir ses kaydı değil, <b>işlenebilir kayıt</b> çıkıyor.
+    Ekranın sağ tarafında bu form konuşma ilerledikçe canlı doluyor:
+  </p>
+
+  <table>
+    <tr><th>Alan</th><th>Nasıl doluyor</th></tr>
+    <tr><td>İsim</td><td>Müşteri söylediğinde otomatik yakalanıyor</td></tr>
+    <tr><td>Telefon</td><td>Sesli söylenen numara yazıya çevriliyor</td></tr>
+    <tr><td>Talep türü</td><td>Görüşmenin niyeti sınıflandırılıyor (satın alma, bilgi, randevu…)</td></tr>
+    <tr><td>Tarih ve saat</td><td>“Yarın öğleden sonra” gibi ifadeler de anlaşılıyor</td></tr>
+    <tr><td>Özet</td><td>Görüşmenin tek cümlelik özeti</td></tr>
+  </table>
+
+  <p>
+    Tamamlanan kayıt <b>CRM'e ve takvime webhook ile gönderilebiliyor</b> — yani müşteri
+    telefonu kapattığı anda randevu takvimde, kayıt CRM'de olabilir.
+  </p>
+
+  <h3>Gerçek telefon hattına bağlanabilir</h3>
+  <p>
+    Sistem tarayıcıyla sınırlı değil. Twilio üzerinden <b>gerçek bir telefon numarası</b>
+    bağlanabiliyor: numara arandığında sistem açıyor, Türkçe konuşuyor, kaydı oluşturuyor.
+    Bağlantı için numara ve alan adı yeterli.
+  </p>
+
+  <h3>Güvenlik ve gizlilik</h3>
+  <ul>
+    <li>API anahtarları yalnız sunucuda; tarayıcıya hiç gitmiyor.</li>
+    <li>Kayıtlar için <b>AES-256 şifreleme</b> desteği ve varsayılan <b>30 gün</b> saklama.</li>
+    <li>Görüşme öncesi <b>açık rıza onayı</b> alınıyor (ekrandaki onay kutusu).</li>
+    <li>IP bazlı hız sınırı, dosya boyut/tür sınırı, aynı-origin koruması.</li>
+    <li>Kişisel veri taşımayan yapılandırılmış loglar.</li>
+  </ul>
+
+  <div class="uyari">
+    <b>Canlıya çıkmadan önce yapılacak:</b> kayıt şifrelemesi şu an <b>kapalı</b>
+    (deneme ortamı). Gerçek müşteri görüşmesi kaydedilecekse şifreleme anahtarı
+    tanımlanmalı. Ayrıca CRM ve takvim webhook'ları henüz bağlı değil.
+  </div>
+</section>
+
+<!-- 4. DURUM -->
+<section class="sayfa">
+  <div class="ust">04 · Durum</div>
+  <h2>Bugün ne çalışıyor, ne eksik</h2>
+
+  <table>
+    <tr><th>Bileşen</th><th>Durum</th><th>Not</th></tr>
+    <tr><td>Türkçe konuşma anlama</td><td><b>Çalışıyor</b></td><td>Fish Audio transcribe-1</td></tr>
+    <tr><td>Cevap üretimi</td><td><b>Çalışıyor</b></td><td>Claude Haiku 4.5</td></tr>
+    <tr><td>Türkçe seslendirme</td><td><b>Çalışıyor</b></td><td>Fish Audio S2 Pro, akışlı</td></tr>
+    <tr><td>Sunum ekranı</td><td><b>Çalışıyor</b></td><td>Hazır senaryolar, canlı döküm, gecikme göstergesi</td></tr>
+    <tr><td>Servis kesintisi yedeği</td><td><b>Çalışıyor</b></td><td>Canlı servis düşerse yerel sesle devam</td></tr>
+    <tr><td>Çağrı kaydı</td><td><b>Çalışıyor</b></td><td>Şifreleme kapalı — açılmalı</td></tr>
+    <tr><td>Telefon hattı (Twilio)</td><td>Kurulu, bağlanmadı</td><td>Numara + alan adı gerekiyor</td></tr>
+    <tr><td>CRM / takvim</td><td>Kurulu, bağlanmadı</td><td>Hedef sistem seçilmeli</td></tr>
+  </table>
+
+  <div class="vurgu">
+    <b>Bu denemede yol boyunca bulunan hata:</b> geliştirme modunda güvenlik başlığı,
+    arayüzün yüklenmesi için gereken betiği engelliyordu — <b>ekran bomboş kalıyordu</b>.
+    Sunumdan önce yakalandı ve düzeltildi. Production paketi bu sorundan etkilenmiyordu.
+  </div>
+
+  <h3>Nerede kullanılabilir</h3>
+  <ul>
+    <li><b>Arsa hattı:</b> ilana gelen aramaları karşılar, ilgilenen kişinin adını,
+      telefonunu ve hangi parselle ilgilendiğini kaydeder.</li>
+    <li><b>Mesai dışı:</b> akşam ve hafta sonu gelen aramalar kaybolmaz.</li>
+    <li><b>Ön eleme:</b> ciddi alıcıyı meraklıdan ayırır, sadece dolu kayıtlar ekibe düşer.</li>
+  </ul>
+
+  <p class="kucuk gri" style="margin-top:14px; border-top:1px solid #e5e0da; padding-top:9px;">
+    Ölçümler 3 Ağustos 2026'da yerel sunucuda, canlı servis bağlantılarıyla alınmıştır.
+    Ekran görüntüsü çalışan uygulamadan alınmıştır. Kullanılan servisler:
+    Anthropic Claude (cevap üretimi), Fish Audio (konuşma tanıma ve seslendirme).
+  </p>
+</section>
+
+</body>
+</html>

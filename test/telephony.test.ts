@@ -4,12 +4,18 @@ import twilio from "twilio";
 import { createGatherResponse, validateTwilioWebhook } from "../server/telephony";
 
 test("TwiML Türkçe konuşma toplar ve dönüş endpointine yönlendirir", () => {
-  const xml = createGatherResponse("Merhaba");
+  const xml = createGatherResponse("Merhaba", null, "tr");
   assert.match(xml, /<Gather/);
   assert.match(xml, /input="speech"/);
   assert.match(xml, /language="tr-TR"/);
   assert.match(xml, /action="\/api\/telephony\/turn"/);
   assert.match(xml, /<Say language="tr-TR">Merhaba<\/Say>/);
+});
+
+test("TwiML seçilen dil kodunu konuşma tanıma ve seslendirmeye taşır", () => {
+  const xml = createGatherResponse("Bonjour", null, "fr");
+  assert.match(xml, /language="fr-FR"/);
+  assert.match(xml, /<Say language="fr-FR">Bonjour<\/Say>/);
 });
 
 test("geçerli Twilio imzasını kabul eder", () => {

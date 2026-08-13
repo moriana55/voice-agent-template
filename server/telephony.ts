@@ -1,3 +1,5 @@
+import { normalizeLocale, type Locale } from "@shared/i18n";
+import { DEFAULT_LOCALE, phoneDisclosure, telephonyLanguage, unheardMessage, welcomeMessage } from "./dil.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,6 +12,7 @@ import { synthesizeFishBuffer } from "./fish";
 import { recordCompletedCall } from "./records";
 
 type PhoneSession = {
+  locale: Locale;
   state: CallState;
   history: ConversationMessage[];
   updatedAt: number;
@@ -43,39 +46,41 @@ export function validateTwilioWebhook(req: Request, res: Response, next: NextFun
   return next();
 }
 
-export function createGatherResponse(prompt: string, audioUrl?: string | null) {
+export function createGatherResponse(prompt: string, audioUrl?: string | null, locale: Locale = DEFAULT_LOCALE) {
+  const language = telephonyLanguage(locale);
   const response = new twilio.twiml.VoiceResponse();
   const gather = response.gather({
     input: ["speech"],
     action: "/api/telephony/turn",
     method: "POST",
-    language: "tr-TR",
+    language: language as "en-US",
     speechTimeout: "auto",
     actionOnEmptyResult: true,
   });
   if (audioUrl) gather.play(audioUrl);
-  else gather.say({ language: "tr-TR" }, prompt);
+  else gather.say({ language: language as "en-US" }, prompt);
   response.redirect({ method: "POST" }, "/api/telephony/incoming");
   return response.toString();
 }
 
-async function createPhoneAudio(text: string) {
+async function createPhoneAudio(text: string, locale: Locale) {
   if (!process.env.FISH_AUDIO_API_KEY || !publicBaseUrl()) return null;
   await mkdir(audioDirectory, { recursive: true, mode: 0o700 });
   const id = randomUUID();
   const filePath = path.join(audioDirectory, `${id}.mp3`);
-  await writeFile(filePath, await synthesizeFishBuffer(text, { phoneOptimized: true }), { mode: 0o600 });
+  await writeFile(filePath, await synthesizeFishBuffer(text, { phoneOptimized: true, locale }), { mode: 0o600 });
   const timer = setTimeout(() => void unlink(filePath).catch(() => undefined), 60 * 60 * 1000);
   timer.unref();
   return `${publicBaseUrl()}/api/telephony/audio/${id}`;
 }
 
-function getSession(callSid: string) {
+function getSession(callSid: string, selectedLocale: Locale = DEFAULT_LOCALE) {
   const existing = sessions.get(callSid);
   if (existing) return existing;
   const session: PhoneSession = {
+    locale: selectedLocale,
     state: callStateSchema.parse({}),
-    history: [{ role: "assistant", content: "Merhaba, ben Arama. Size nasıl yardımcı olabilirim?" }],
+    history: [{ role: "assistant", content: welcomeMessage(selectedLocale) }],
     updatedAt: Date.now(),
   };
   sessions.set(callSid, session);
@@ -107,10 +112,11 @@ export function registerTelephonyRoutes(app: Express) {
     try {
       cleanOldSessions();
       const callSid = String(req.body.CallSid || randomUUID());
-      getSession(callSid);
-      const prompt = "Merhaba, ben Arama. Bu görüşme talebinizi yanıtlamak ve kayıt oluşturmak için yapay zekâ servisleriyle işlenir. Randevu, fiyat veya destek konusunda size nasıl yardımcı olabilirim?";
-      const audioUrl = await createPhoneAudio(prompt);
-      return res.type("text/xml").send(createGatherResponse(prompt, audioUrl));
+      const locale = normalizeLocale(req.query.locale || req.body.locale, DEFAULT_LOCALE);
+      getSession(callSid, locale);
+      const prompt = phoneDisclosure(locale);
+      const audioUrl = await createPhoneAudio(prompt, locale);
+      return res.type("text/xml").send(createGatherResponse(prompt, audioUrl, locale));
     } catch (error) {
       return next(error);
     }
@@ -124,14 +130,14 @@ export function registerTelephonyRoutes(app: Express) {
       session.updatedAt = Date.now();
 
       if (!transcript) {
-        const prompt = "Sizi duyamadım. Talebinizi tekrar söyler misiniz?";
-        const audioUrl = await createPhoneAudio(prompt);
-        return res.type("text/xml").send(createGatherResponse(prompt, audioUrl));
+        const prompt = unheardMessage(session.locale);
+        const audioUrl = await createPhoneAudio(prompt, session.locale);
+        return res.type("text/xml").send(createGatherResponse(prompt, audioUrl, session.locale));
       }
 
       const previousState = session.state;
-      const state = updateCallState(transcript, previousState);
-      const reply = await generateAssistantReply(transcript, session.history, state);
+      const state = updateCallState(transcript, previousState, session.locale);
+      const reply = await generateAssistantReply(transcript, session.history, state, session.locale);
       session.state = state;
       session.history = ([
         ...session.history,
@@ -143,22 +149,23 @@ export function registerTelephonyRoutes(app: Express) {
         await recordCompletedCall({
           callId: callSid,
           source: "twilio",
+          locale: session.locale,
           state,
           transcript,
           history: session.history,
         });
       }
 
-      const audioUrl = await createPhoneAudio(reply);
+      const audioUrl = await createPhoneAudio(reply, session.locale);
       if (state.completed) {
         const response = new twilio.twiml.VoiceResponse();
         if (audioUrl) response.play(audioUrl);
-        else response.say({ language: "tr-TR" }, reply);
+        else response.say({ language: telephonyLanguage(session.locale) as "en-US" }, reply);
         response.hangup();
         sessions.delete(callSid);
         return res.type("text/xml").send(response.toString());
       }
-      return res.type("text/xml").send(createGatherResponse(reply, audioUrl));
+      return res.type("text/xml").send(createGatherResponse(reply, audioUrl, session.locale));
     } catch (error) {
       return next(error);
     }

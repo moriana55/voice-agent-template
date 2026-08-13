@@ -18,6 +18,7 @@ const callId = crypto.randomUUID();
 const body = new FormData();
 body.set("callId", callId);
 body.set("consent", "true");
+body.set("locale", "tr");
 body.set("text", "Yarın saat 15:00 için randevu istiyorum, adım Ayşe Yılmaz, telefonum 0532 123 45 67");
 body.set("history", "[]");
 body.set("state", "{}");
@@ -29,6 +30,7 @@ assert(turnPayload.recorded === true, "turn was not recorded");
 
 const noConsentBody = new FormData();
 noConsentBody.set("callId", crypto.randomUUID());
+noConsentBody.set("locale", "tr");
 noConsentBody.set("text", "Merhaba");
 noConsentBody.set("history", "[]");
 noConsentBody.set("state", "{}");
@@ -44,8 +46,9 @@ const recordsPayload = await records.json();
 assert(records.status === 200, `admin records ${records.status}`);
 assert(recordsPayload.records?.some((record) => record.callId === callId), "saved call record missing");
 
-const incomingUrl = `${baseUrl}/api/telephony/incoming`;
-const twilioBody = new URLSearchParams({ CallSid: "CA-smoke-test" });
+const phoneCallSid = `CA-${crypto.randomUUID()}`;
+const incomingUrl = `${baseUrl}/api/telephony/incoming?locale=tr`;
+const twilioBody = new URLSearchParams({ CallSid: phoneCallSid });
 const signature = twilio.getExpectedTwilioSignature(
   twilioToken,
   incomingUrl,
@@ -82,7 +85,6 @@ async function twilioPost(path, parameters) {
   });
 }
 
-const phoneCallSid = `CA-${crypto.randomUUID()}`;
 const phoneTurns = [
   "Fiyat teklifi almak istiyorum",
   "Ben Ayşe Yılmaz",
@@ -106,8 +108,12 @@ assert(
   finalRecords.records?.some((record) => record.callId === phoneCallSid && record.source === "twilio"),
   "completed phone call record missing",
 );
+assert(
+  finalRecords.records?.some((record) => record.callId === phoneCallSid && record.locale === "tr"),
+  "completed phone call locale missing",
+);
 
 console.log(JSON.stringify({
   ok: true,
-  checks: ["live", "ready", "consent", "turn", "record", "admin-auth", "twilio-signature", "twiml", "phone-turns"],
+  checks: ["live", "ready", "locale", "consent", "turn", "record", "admin-auth", "twilio-signature", "twiml", "phone-turns"],
 }));

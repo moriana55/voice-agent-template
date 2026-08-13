@@ -3,16 +3,24 @@ import type { NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 
+// ── GELİŞTİRME MODU İSTİSNASI (2026-08-03) ──────────────────────────────────
+// Vite dev sunucusu sayfaya bir SATIR İÇİ önyükleme betiği (react-refresh
+// preamble) enjekte eder. `script-src 'self'` bunu engelleyince React hiç
+// çalışmıyor ve ekran BOMBOŞ kalıyordu — "@vitejs/plugin-react can't detect
+// preamble" hatası. Sadece geliştirmede 'unsafe-inline' + websocket bağlantısı
+// açılıyor; production paketinde satır içi betik yok, kural sıkı kalıyor.
+const gelistirme = process.env.NODE_ENV !== "production";
+
 export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: gelistirme ? ["'self'", "'unsafe-inline'"] : ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://api.fontshare.com"],
       fontSrc: ["'self'", "https://cdn.fontshare.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:"],
       mediaSrc: ["'self'", "blob:"],
-      connectSrc: ["'self'"],
+      connectSrc: gelistirme ? ["'self'", "ws:", "wss:"] : ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],

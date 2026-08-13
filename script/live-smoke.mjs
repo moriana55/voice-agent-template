@@ -11,6 +11,7 @@ assert(ready.status === 200 && readyPayload.ready === true, `service not ready: 
 const body = new FormData();
 body.set("callId", crypto.randomUUID());
 body.set("consent", "true");
+body.set("locale", "tr");
 body.set("text", "Merhaba, fiyat bilgisi almak istiyorum.");
 body.set("history", "[]");
 body.set("state", "{}");

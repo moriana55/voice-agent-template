@@ -1,0 +1,27 @@
+product:
+  name: Arama
+  category: multilingual_voice_agent
+  audience:
+    - service businesses
+    - sales and support teams
+    - recruiters and engineering managers reviewing the portfolio
+promise: One voice workflow that listens, understands, speaks, and records customer intent across ten languages.
+proof:
+  - shared locale contract across browser and server
+  - locale-aware deterministic intent and slot extraction
+  - streaming LLM-to-TTS path with local fallback
+  - encrypted call record option and retention controls
+  - Twilio webhook signature verification and locale-aware TwiML
+personality:
+  - calm
+  - precise
+  - warm
+  - operational
+visual_language:
+  typography: Cabinet Grotesk with Satoshi and a restrained mono layer
+  palette: warm neutral surfaces with orange action and green success accents
+  interaction: one primary voice action with progressive operational detail
+non_goals:
+  - generic chatbot dashboard styling
+  - decorative AI gradients
+  - unverified claims of full production readiness

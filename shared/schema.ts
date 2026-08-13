@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const localeSchema = z.enum(["en", "tr", "es", "de", "fr", "it", "pt", "nl", "pl", "ru"]);
+
 export const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),
@@ -19,6 +21,7 @@ export const callStateSchema = z.object({
 export const turnRequestSchema = z.object({
   callId: z.string().uuid().optional(),
   consent: z.literal(true),
+  locale: localeSchema.default("en"),
   text: z.string().max(4000).optional(),
   history: z.array(messageSchema).max(20).default([]),
   state: callStateSchema.optional(),

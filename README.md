@@ -1,9 +1,15 @@
-# Arama — Voice Agent Template
+# Arama — Multilingual Voice Agent
 
-Türkçe çağrı elemanı prototipi. Tarayıcıdan mikrofon kaydı alır, OpenAI veya
-Fish Audio ile yazıya çevirir, Claude ile cevabı üretir ve Fish Audio ile
-konuşur. API anahtarları yokken yerleşik demo modu sayesinde arayüz ve akış
-çalışmaya devam eder.
+10 dil destekli düşük gecikmeli çağrı elemanı prototipi. Tarayıcıdan mikrofon
+kaydı alır, OpenAI veya Fish Audio ile seçilen dilde yazıya çevirir, Claude ya
+da OpenAI ile cevabı üretir ve Fish Audio ile konuşur. API anahtarları yokken
+yerleşik demo motoru sayesinde arayüz, yapılandırılmış çağrı kaydı ve senaryo
+akışı çalışmaya devam eder.
+
+Desteklenen diller: İngilizce, Türkçe, İspanyolca, Almanca, Fransızca,
+İtalyanca, Portekizce, Felemenkçe, Lehçe ve Rusça. Dil görüşme sırasında
+arayüzden seçilir; seçim transkripsiyon, niyet çıkarımı, model talimatı, ses
+sentezi, yerel demo ve indirilen özete birlikte uygulanır.
 
 ## Kurulum
 
@@ -27,6 +33,9 @@ servis hataları sunum ekranında gösterilmez.
 - `OPENAI_API_KEY`: isteğe bağlı OpenAI transkripsiyonu ve Claude yoksa cevap üretimi
 - `FISH_AUDIO_API_KEY`: Fish Audio TTS
 - `FISH_AUDIO_REFERENCE_ID`: kullanılacak/klonlanmış Fish sesi
+- `FISH_AUDIO_REFERENCE_ID_EN`, `_TR`, `_ES`, `_DE`, `_FR`, `_IT`, `_PT`,
+  `_NL`, `_PL`, `_RU`: dile özel ses kimlikleri; tanımsızsa ortak ses kullanılır
+- `AGENT_LANG`: API/telefon isteği dil belirtmezse varsayılan dil (`en`)
 - `DEMO_MODE=false`: gerçek bağlantıları zorunlu kılar
 
 API anahtarları yalnızca Express sunucusunda tutulur; tarayıcıya gönderilmez.
@@ -34,7 +43,8 @@ API anahtarları yalnızca Express sunucusunda tutulur; tarayıcıya gönderilme
 ## Akış
 
 1. Düğmeye basıp konuş, kaydı bitirerek gönder veya metin yaz.
-2. `/api/turn` ses dosyasını OpenAI veya Fish Audio transcription servisine gönderir.
+2. İstemci seçilen dili `locale` alanıyla API'ye taşır; `/api/turn` ses dosyasını
+   aynı dil koduyla OpenAI veya Fish Audio transcription servisine gönderir.
 3. `/api/turn/stream`, görüşme niyetine uygun kısa girişi anında başlatır.
 4. Claude Messages API cevabı SSE parçaları hâlinde üretirken Fish Audio'nun
    resmî JavaScript SDK'sı metni WebSocket TTS akışına besler.
@@ -54,7 +64,7 @@ yanıt sürerken mikrofona basarak oynatmayı ve devam eden API isteğini kesebi
 - Tamamlanan lead/randevular için kalıcı JSONL kayıt ve isteğe bağlı AES-256-GCM şifreleme
 - Yetkili kayıt listeleme/silme endpointleri ve varsayılan 30 günlük saklama süresi
 - CRM ve takvim için bağımsız webhook adaptörleri
-- Twilio gelen arama webhooku, Türkçe speech gather ve Fish Audio MP3 `<Play>` yanıtı
+- Twilio gelen arama webhooku, locale uyumlu speech gather ve Fish Audio MP3 `<Play>` yanıtı
 - İstemciden sunucuya taşınan iptal sinyali, sessizlik algılama ve açık rıza kontrolü
 - Node test runner testleri, GitHub Actions CI ve production HTTP smoke testi
 
@@ -65,9 +75,10 @@ anahtarlarını zorunlu secret olarak tanımlayın. Ayrıntılar için `PRIVACY.
 
 1. Uygulamayı HTTPS ile dışarı açın ve `PUBLIC_BASE_URL` değerini yazın.
 2. Twilio numarasının gelen arama webhookunu `POST /api/telephony/incoming` yapın.
+   Hat dilini URL'de örneğin `?locale=tr`, `?locale=de` veya `?locale=fr` ile seçin.
 3. `TWILIO_AUTH_TOKEN` değerini secret olarak ekleyin.
 4. Fish anahtarı ve public URL varsa yanıt MP3 olarak üretilip Twilio `<Play>` ile çalınır;
-   Fish yoksa Twilio Türkçe `<Say>` yedeği kullanılır.
+   Fish yoksa Twilio seçilen locale ile `<Say>` yedeğini kullanır.
 
 Webhook imzası production ortamında zorunludur. Telefon adaptörü Twilio'nun `CallSid`
 değeriyle görüşme durumunu tutar ve tamamlanan talebi normal kayıt/CRM akışına gönderir.
@@ -79,6 +90,9 @@ npm run check
 npm test
 npm run build
 ```
+
+Test paketi on dilde randevu niyeti, göreli tarih ve saat çıkarımını; ayrıca
+uluslararası telefon/isim tamamlama, şifreli kayıt ve Twilio locale üretimini kapsar.
 
 Production sunucusu ayrı bir terminalde çalışırken uçtan uca yerel kontrol:
 

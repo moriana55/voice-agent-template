@@ -1,3 +1,12 @@
+import type { Locale } from "@shared/i18n";
+import { supportedLocales } from "@shared/i18n";
+import {
+  DEFAULT_LOCALE,
+  openingLeadIn,
+  systemInstructions,
+  transcriptionLanguage,
+  voiceId,
+} from "./dil.js";
 import type { Express, Response } from "express";
 import type { Server } from "http";
 import { randomUUID } from "node:crypto";
@@ -29,11 +38,6 @@ const upload = multer({
     else callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
   },
 });
-
-const SYSTEM_PROMPT = `Sen Türkçe konuşan profesyonel bir çağrı merkezi elemanısın.
-Kısa, doğal ve sıcak konuş. Bir seferde en fazla iki kısa cümle kur.
-Bilmediğin müşteri veya şirket bilgisini uydurma; gerektiğinde temsilciye aktaracağını söyle.
-Kullanıcının talebini önce anladığını göster, sonra net bir sonraki adım öner.`;
 
 type StreamEvent =
   | { type: "meta"; transcript: string; state: CallState; mode: string }
@@ -91,25 +95,25 @@ function isDemoBrain() {
     || (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY);
 }
 
-async function transcribeAudio(openai: OpenAI, file: Express.Multer.File, signal?: AbortSignal) {
+async function transcribeAudio(openai: OpenAI, file: Express.Multer.File, locale: Locale, signal?: AbortSignal) {
   const uploaded = await toFile(file.buffer, file.originalname || "recording.webm", {
     type: file.mimetype || "audio/webm",
   });
   const result = await openai.audio.transcriptions.create({
     file: uploaded,
     model: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe",
-    language: "tr",
+    language: transcriptionLanguage(locale),
   }, { signal: withTimeout(signal, 20_000) });
   return result.text.trim();
 }
 
-async function transcribeFish(file: Express.Multer.File, signal?: AbortSignal) {
+async function transcribeFish(file: Express.Multer.File, locale: Locale, signal?: AbortSignal) {
   const form = new FormData();
   const audioBuffer = new ArrayBuffer(file.buffer.byteLength);
   new Uint8Array(audioBuffer).set(file.buffer);
   form.append("audio", new Blob([audioBuffer], { type: file.mimetype || "audio/webm" }),
     file.originalname || "recording.webm");
-  form.append("language", "tr");
+  form.append("language", transcriptionLanguage(locale));
   form.append("ignore_timestamps", "true");
   const response = await fetch("https://api.fish.audio/v1/asr", {
     method: "POST",
@@ -151,35 +155,45 @@ function buildConversationPrompt(
   transcript: string,
   history: ConversationMessage[],
   state: CallState,
+  locale: Locale,
 ) {
+  const labels = locale === "tr"
+    ? { customer: "Müşteri", agent: "Temsilci", context: "Doğrulanmış işletme bilgisi", state: "Görüşme durumu", rule: "Eksik alanlardan yalnızca birini doğal biçimde sor. Tamamlanan bilgiyi tekrar isteme." }
+    : { customer: "Customer", agent: "Agent", context: "Verified business information", state: "Call state", rule: "Ask naturally for only one missing field. Never request information that is already complete." };
   const conversation = history
     .slice(-10)
-    .map((item) => `${item.role === "user" ? "Müşteri" : "Temsilci"}: ${item.content}`)
+    .map((item) => `${item.role === "user" ? labels.customer : labels.agent}: ${item.content}`)
     .join("\n");
 
   const businessContext = process.env.BUSINESS_CONTEXT?.trim();
-  return `${businessContext ? `Doğrulanmış işletme bilgisi:\n${businessContext}\n` : ""}Görüşme durumu: ${JSON.stringify(state)}
-Eksik alanlardan yalnızca birini doğal biçimde sor. Tamamlanan bilgiyi tekrar isteme.
-${conversation ? `${conversation}\n` : ""}Müşteri: ${transcript}\nTemsilci:`;
+  return `${businessContext ? `${labels.context}:\n${businessContext}\n` : ""}${labels.state}: ${JSON.stringify(state)}
+${labels.rule}
+${conversation ? `${conversation}\n` : ""}${labels.customer}: ${transcript}\n${labels.agent}:`;
 }
 
-function streamingLeadIn(state: CallState) {
-  if (state.intent === "randevu") return "Elbette, randevunuzu birlikte hemen oluşturalım. ";
-  if (state.intent === "fiyat") return "Tabii, fiyat bilgisi için hemen yardımcı olayım. ";
-  if (state.intent === "destek") return "Anladım, sorunu birlikte hızlıca kontrol edelim. ";
-  return "Tabii, sizi dinliyorum; hemen yardımcı olayım. ";
+function streamingLeadIn(state: CallState, locale: Locale) {
+  if (locale === "en") {
+    if (state.intent === "randevu") return "Of course, let's set up your appointment. ";
+    if (state.intent === "fiyat") return "Certainly, I can help with pricing. ";
+    if (state.intent === "destek") return "I understand. Let's get that issue sorted out. ";
+  } else if (locale === "tr") {
+    if (state.intent === "randevu") return "Elbette, randevunuzu birlikte hemen oluşturalım. ";
+    if (state.intent === "fiyat") return "Tabii, fiyat bilgisi için hemen yardımcı olayım. ";
+    if (state.intent === "destek") return "Anladım, sorunu birlikte hızlıca kontrol edelim. ";
+  }
+  return openingLeadIn(locale);
 }
 
 function sanitizeStreamingContinuation(value: string) {
   return value
     .trimStart()
-    .replace(/^(?:(?:tabii|elbette|anladım|merhaba|memnuniyetle)[,!:.]?\s*)+/i, "")
+    .replace(/^(?:(?:tabii|elbette|anladım|merhaba|memnuniyetle|sure|certainly|of course|understood|hello)[,!:.]?\s*)+/i, "");
 }
 
-function cleanStreamingContinuation(value: string) {
+function cleanStreamingContinuation(value: string, locale: Locale) {
   const cleaned = sanitizeStreamingContinuation(value).trim();
-  if (!cleaned) return "Size nasıl yardımcı olabilirim?";
-  return `${cleaned.charAt(0).toLocaleUpperCase("tr")}${cleaned.slice(1)}`;
+  if (!cleaned) return locale === "tr" ? "Size nasıl yardımcı olabilirim?" : "How can I help you?";
+  return `${cleaned.charAt(0).toLocaleUpperCase(locale === "tr" ? "tr-TR" : "en-US")}${cleaned.slice(1)}`;
 }
 
 async function generateOpenAIReply(
@@ -187,12 +201,13 @@ async function generateOpenAIReply(
   transcript: string,
   history: ConversationMessage[],
   state: CallState,
+  locale: Locale,
   signal?: AbortSignal,
 ) {
   const response = await openai.responses.create({
     model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
-    instructions: SYSTEM_PROMPT,
-    input: buildConversationPrompt(transcript, history, state),
+    instructions: systemInstructions(locale),
+    input: buildConversationPrompt(transcript, history, state, locale),
     store: false,
   }, { signal: withTimeout(signal, 20_000) });
   return response.output_text.trim();
@@ -202,6 +217,7 @@ async function generateClaudeReply(
   transcript: string,
   history: ConversationMessage[],
   state: CallState,
+  locale: Locale,
   signal?: AbortSignal,
 ) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -214,11 +230,11 @@ async function generateClaudeReply(
     body: JSON.stringify({
       model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 180,
-      system: SYSTEM_PROMPT,
+      system: systemInstructions(locale),
       messages: [
         {
           role: "user",
-          content: buildConversationPrompt(transcript, history, state),
+          content: buildConversationPrompt(transcript, history, state, locale),
         },
       ],
     }),
@@ -248,8 +264,15 @@ async function* streamClaudeReply(
   history: ConversationMessage[],
   state: CallState,
   leadIn: string,
+  locale: Locale,
   signal?: AbortSignal,
 ) {
+  const continuationInstruction = locale === "tr"
+    ? "Temsilci şu giriş cümlesini zaten seslendirdi"
+    : "The agent has already spoken this opening sentence";
+  const responseInstruction = locale === "tr"
+    ? "Bu girişi, selamlamayı veya onayı tekrar etme. Yalnızca tek kısa cümleyle gerekli soruyu ya da net cevabı ver."
+    : "Do not repeat the opening, greeting, or acknowledgment. In one short sentence, provide only the needed question or clear answer.";
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -260,14 +283,14 @@ async function* streamClaudeReply(
     body: JSON.stringify({
       model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 180,
-      system: SYSTEM_PROMPT,
+      system: systemInstructions(locale),
       stream: true,
       messages: [
         {
           role: "user",
-          content: `${buildConversationPrompt(transcript, history, state)}
-Temsilci şu giriş cümlesini zaten seslendirdi: ${JSON.stringify(leadIn.trim())}
-Bu girişi, selamlamayı veya onayı tekrar etme. Yalnızca tek kısa cümleyle gerekli soruyu ya da net cevabı ver.`,
+          content: `${buildConversationPrompt(transcript, history, state, locale)}
+${continuationInstruction}: ${JSON.stringify(leadIn.trim())}
+${responseInstruction}`,
         },
       ],
     }),
@@ -332,8 +355,8 @@ function writeStreamEvent(res: Response, event: StreamEvent) {
   if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(event)}\n`);
 }
 
-async function synthesizeFish(text: string, signal?: AbortSignal) {
-  return (await synthesizeFishBuffer(text, { signal })).toString("base64");
+async function synthesizeFish(text: string, locale: Locale, signal?: AbortSignal) {
+  return (await synthesizeFishBuffer(text, { signal, locale })).toString("base64");
 }
 
 export async function registerRoutes(
@@ -392,7 +415,7 @@ export async function registerRoutes(
         anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
         openai: Boolean(process.env.OPENAI_API_KEY),
         fishAudio: fishEnabled,
-        voice: Boolean(process.env.FISH_AUDIO_REFERENCE_ID),
+        voice: Boolean(voiceId(DEFAULT_LOCALE)),
       },
       models: {
         llm: process.env.ANTHROPIC_API_KEY
@@ -406,6 +429,10 @@ export async function registerRoutes(
         speech: process.env.FISH_AUDIO_MODEL || "s2-pro",
       },
       records: recordsStatus(),
+      localization: {
+        defaultLocale: DEFAULT_LOCALE,
+        supportedLocales,
+      },
     });
   });
 
@@ -423,6 +450,7 @@ export async function registerRoutes(
       const payload = turnRequestSchema.parse({
         callId: req.body.callId || undefined,
         consent: req.body.consent === "true",
+        locale: req.body.locale || undefined,
         text: req.body.text || undefined,
         history: parsedHistory,
         state: parsedState,
@@ -437,15 +465,17 @@ export async function registerRoutes(
 
       let transcript = payload.text?.trim() || "";
       if (!transcript && req.file && openai) {
-        transcript = await transcribeAudio(openai, req.file, requestAbort.signal);
+        transcript = await transcribeAudio(openai, req.file, payload.locale, requestAbort.signal);
       } else if (!transcript && req.file && fishEnabled) {
-        transcript = await transcribeFish(req.file, requestAbort.signal);
+        transcript = await transcribeFish(req.file, payload.locale, requestAbort.signal);
       }
       if (!transcript) {
-        return res.status(400).json({ message: "Konuşma veya metin bulunamadı." });
+        return res.status(400).json({
+          message: payload.locale === "tr" ? "Konuşma veya metin bulunamadı." : "No speech or text was provided.",
+        });
       }
 
-      const state = updateCallState(transcript, payload.state);
+      const state = updateCallState(transcript, payload.state, payload.locale);
       const mode = !demo ? "live" : fishEnabled ? "fish-live" : "demo";
       res.status(200);
       res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
@@ -462,7 +492,7 @@ export async function registerRoutes(
 
       if (!demo && claudeEnabled) {
         const textQueue = new AsyncTextQueue();
-        const leadIn = streamingLeadIn(state);
+        const leadIn = streamingLeadIn(state, payload.locale);
         let finishFish: Promise<void> | null = null;
         let closeFish: (() => void) | null = null;
         let flushFish: (() => void) | null = null;
@@ -471,7 +501,7 @@ export async function registerRoutes(
           const client = new FishAudioClient({ apiKey: process.env.FISH_AUDIO_API_KEY });
           const connection = await client.textToSpeech.convertRealtime({
             text: "",
-            reference_id: process.env.FISH_AUDIO_REFERENCE_ID || undefined,
+            reference_id: voiceId(payload.locale),
             format: "mp3",
             sample_rate: 44_100,
             mp3_bitrate: 128,
@@ -537,6 +567,7 @@ export async function registerRoutes(
             payload.history,
             state,
             leadIn,
+            payload.locale,
             requestAbort.signal,
           )) {
             continuation += delta;
@@ -551,11 +582,11 @@ export async function registerRoutes(
             if (pendingStart.trim().length < 18) continue;
             const cleanedStart = sanitizeStreamingContinuation(pendingStart).trimStart();
             if (cleanedStart.trim()) {
-              streamContinuation(`${cleanedStart.charAt(0).toLocaleUpperCase("tr")}${cleanedStart.slice(1)}`);
+              streamContinuation(`${cleanedStart.charAt(0).toLocaleUpperCase(payload.locale === "tr" ? "tr-TR" : "en-US")}${cleanedStart.slice(1)}`);
             }
             continuationStarted = true;
           }
-          if (!continuationStarted) streamContinuation(cleanStreamingContinuation(continuation));
+          if (!continuationStarted) streamContinuation(cleanStreamingContinuation(continuation, payload.locale));
           textQueue.end();
           if (finishFish) await finishFish;
         } catch (error) {
@@ -565,12 +596,12 @@ export async function registerRoutes(
         }
       } else {
         reply = !demo && openai
-          ? await generateOpenAIReply(openai, transcript, payload.history, state, requestAbort.signal)
-          : demoReply(transcript, payload.history, state);
+          ? await generateOpenAIReply(openai, transcript, payload.history, state, payload.locale, requestAbort.signal)
+          : demoReply(transcript, payload.history, state, payload.locale);
         writeStreamEvent(res, { type: "text_delta", text: reply });
         if (fishEnabled) {
           try {
-            const audioBase64 = await synthesizeFish(reply, requestAbort.signal);
+            const audioBase64 = await synthesizeFish(reply, payload.locale, requestAbort.signal);
             firstAudioMs = Date.now() - startedAt;
             writeStreamEvent(res, { type: "audio", audioBase64, audioMime: "audio/mpeg" });
           } catch (error) {
@@ -583,6 +614,7 @@ export async function registerRoutes(
         const result = await recordCompletedCall({
           callId: payload.callId || randomUUID(),
           source: "web",
+          locale: payload.locale,
           state,
           transcript,
           history: [
@@ -626,6 +658,7 @@ export async function registerRoutes(
       const payload = turnRequestSchema.parse({
         callId: req.body.callId || undefined,
         consent: req.body.consent === "true",
+        locale: req.body.locale || undefined,
         text: req.body.text || undefined,
         history: parsedHistory,
         state: parsedState,
@@ -640,26 +673,28 @@ export async function registerRoutes(
 
       let transcript = payload.text?.trim() || "";
       if (!transcript && req.file && openai) {
-        transcript = await transcribeAudio(openai, req.file, requestAbort.signal);
+        transcript = await transcribeAudio(openai, req.file, payload.locale, requestAbort.signal);
       } else if (!transcript && req.file && fishEnabled) {
-        transcript = await transcribeFish(req.file, requestAbort.signal);
+        transcript = await transcribeFish(req.file, payload.locale, requestAbort.signal);
       }
       if (!transcript) {
-        return res.status(400).json({ message: "Konuşma veya metin bulunamadı." });
+        return res.status(400).json({
+          message: payload.locale === "tr" ? "Konuşma veya metin bulunamadı." : "No speech or text was provided.",
+        });
       }
-      const state = updateCallState(transcript, payload.state);
+      const state = updateCallState(transcript, payload.state, payload.locale);
 
       const reply = !demo && claudeEnabled
-        ? await generateClaudeReply(transcript, payload.history, state, requestAbort.signal)
+        ? await generateClaudeReply(transcript, payload.history, state, payload.locale, requestAbort.signal)
         : !demo && openai
-          ? await generateOpenAIReply(openai, transcript, payload.history, state, requestAbort.signal)
-          : demoReply(transcript, payload.history, state);
+          ? await generateOpenAIReply(openai, transcript, payload.history, state, payload.locale, requestAbort.signal)
+          : demoReply(transcript, payload.history, state, payload.locale);
 
       let audioBase64: string | null = null;
       let audioWarning: string | null = null;
       if (fishEnabled) {
         try {
-          audioBase64 = await synthesizeFish(reply, requestAbort.signal);
+          audioBase64 = await synthesizeFish(reply, payload.locale, requestAbort.signal);
         } catch (error) {
           audioWarning = error instanceof Error ? error.message : "Fish Audio yanıt vermedi.";
         }
@@ -670,6 +705,7 @@ export async function registerRoutes(
         const result = await recordCompletedCall({
           callId: payload.callId || randomUUID(),
           source: "web",
+          locale: payload.locale,
           state,
           transcript,
           history: [

@@ -1,0 +1,14 @@
+project_id: arama-voice-agent
+name: Arama Multilingual Voice Agent
+mode: revise
+type: web-app
+status: implementation_verified
+repository: https://github.com/moriana55/voice-agent-template
+working_directory: ../../
+creative_direction: preserve_existing_product_identity
+current_gate: 6
+production_allowed: false
+release_blockers:
+  - Verify provider credentials, data-processing agreements, and jurisdiction-specific consent copy.
+  - Run live call tests for every enabled Twilio locale and chosen Fish voice.
+  - Configure production encryption, admin access, retention, and alerting secrets.

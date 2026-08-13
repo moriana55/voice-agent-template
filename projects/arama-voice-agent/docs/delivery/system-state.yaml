@@ -1,0 +1,20 @@
+revision: multilingual-v1
+verified_on: 2026-08-13
+implementation:
+  locale_count: 10
+  locale_source: shared/i18n.ts
+  client_copy: client/src/i18n.ts
+  intent_engine: shared/call-logic.ts
+  server_language_policy: server/dil.ts
+  persisted_locale: true
+verification:
+  typecheck: passed
+  automated_tests: 18_passed
+  production_build: passed
+  production_http_smoke: passed
+  browser_desktop: passed
+  browser_mobile_375px: passed
+  interactive_locale_scenario: french_appointment_passed
+release:
+  production_allowed: false
+  reason: Live provider, legal, secret, retention, and monitoring checks remain environment-specific.
