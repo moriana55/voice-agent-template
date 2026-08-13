@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 test("tamamlanan çağrıyı şifreli ve tekil olarak kaydeder", async () => {
-  process.env.DATA_DIR = await mkdtemp(path.join(os.tmpdir(), "arama-records-"));
+  process.env.DATA_DIR = await mkdtemp(path.join(os.tmpdir(), "voiceops-records-"));
   process.env.DATA_ENCRYPTION_KEY = "test-only-encryption-key";
   delete process.env.CRM_WEBHOOK_URL;
   delete process.env.RECORD_STORAGE;

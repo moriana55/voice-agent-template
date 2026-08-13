@@ -1,8 +1,8 @@
-# Arama portfolio case study
+# VoiceOps Studio portfolio case study
 
 ## Positioning
 
-Arama demonstrates how a multilingual customer-call workflow can preserve language context, structured state, live speech, privacy boundaries, and provider fallback across both browser and telephone channels.
+VoiceOps Studio demonstrates how a multilingual customer-call workflow can preserve language context, structured state, live speech, privacy boundaries, and provider fallback across both browser and telephone channels.
 
 ## Problem
 
@@ -37,11 +37,11 @@ The 1.02 s first-audio number visible in the screenshot is one observed local ru
 
 ### Desktop operations console
 
-![Desktop voice operations console](assets/arama-console.jpg)
+![Desktop voice operations console](assets/voiceops-studio-console.jpg)
 
 ### Mobile presentation state
 
-<img src="assets/arama-mobile.jpg" alt="Mobile Arama presentation console" width="390" />
+<img src="assets/voiceops-studio-mobile.jpg" alt="Mobile VoiceOps Studio presentation console" width="390" />
 
 ## Known limits
 

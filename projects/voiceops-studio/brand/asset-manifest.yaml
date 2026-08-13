@@ -1,5 +1,5 @@
 assets:
-  - id: arama-mark
+  - id: voiceops-studio-mark
     kind: inline-svg
     source: client/src/App.tsx
     status: existing

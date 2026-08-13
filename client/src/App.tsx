@@ -217,7 +217,7 @@ export default function App() {
   const [location, navigate] = useLocation();
   const presentationMode = location === "/present";
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(
-    window.localStorage.getItem("arama-locale") || navigator.language,
+    window.localStorage.getItem("voiceops-studio-locale") || navigator.language,
     "en",
   ));
   const t = getCopy(locale);
@@ -236,7 +236,7 @@ export default function App() {
   const [usingFallback, setUsingFallback] = useState(false);
   const [activeScenario, setActiveScenario] = useState<PresentationScenario["id"] | null>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(
-    () => window.localStorage.getItem("arama-privacy-consent") === "accepted",
+    () => window.localStorage.getItem("voiceops-studio-privacy-consent") === "accepted",
   );
   const [recordSaved, setRecordSaved] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -262,7 +262,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = localeMetadata[locale].html;
-    window.localStorage.setItem("arama-locale", locale);
+    window.localStorage.setItem("voiceops-studio-locale", locale);
   }, [locale]);
 
   function refreshStatus() {
@@ -295,8 +295,8 @@ export default function App() {
 
   function setConsent(accepted: boolean) {
     setPrivacyAccepted(accepted);
-    if (accepted) window.localStorage.setItem("arama-privacy-consent", "accepted");
-    else window.localStorage.removeItem("arama-privacy-consent");
+    if (accepted) window.localStorage.setItem("voiceops-studio-privacy-consent", "accepted");
+    else window.localStorage.removeItem("voiceops-studio-privacy-consent");
   }
 
   function changeLocale(nextLocale: Locale) {
@@ -559,12 +559,12 @@ export default function App() {
       `${t.time}: ${callState.requestedTime || t.notProvided}`,
       `${t.summary}: ${callState.summary}`,
       "",
-      ...messages.map((message) => `${message.role === "assistant" ? "Arama" : t.customer}: ${message.content}`),
+      ...messages.map((message) => `${message.role === "assistant" ? "Nova" : t.customer}: ${message.content}`),
     ];
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `arama-call-${locale}-${Date.now()}.txt`;
+    anchor.download = `voiceops-call-${locale}-${Date.now()}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -624,12 +624,12 @@ export default function App() {
       <div className={`app-shell ${presentationMode ? "presentation-mode" : ""}`}>
         <header className="topbar">
           <Link className="brand" href="/" aria-label={t.home} data-testid="link-home">
-            <svg viewBox="0 0 40 40" role="img" aria-label="Arama">
+            <svg viewBox="0 0 40 40" role="img" aria-label="VoiceOps Studio">
               <path d="M9 20c0-8 4-12 11-12s11 4 11 12-4 12-11 12" />
               <path d="M14 16v8M20 13v14M26 16v8" />
             </svg>
             <span className="brand-copy">
-              <strong>ARAMA</strong>
+              <strong>VOICEOPS STUDIO</strong>
               <small>{presentationMode ? "GLOBAL VOICE OPERATIONS / LIVE" : "GLOBAL VOICE OPERATIONS"}</small>
             </span>
           </Link>
@@ -799,13 +799,13 @@ export default function App() {
                     <div className="avatar" aria-hidden="true">
                       {message.role === "assistant" ? <Bot size={16} /> : <UserRound size={16} />}
                     </div>
-                    <div><strong>{message.role === "assistant" ? "Arama" : t.you}</strong>
+                    <div><strong>{message.role === "assistant" ? "Nova" : t.you}</strong>
                       <p>{message.content}</p></div>
                   </article>
                 ))}
                 {busy && <article className="message assistant"><div className="avatar"><Bot size={16} /></div>
                   {streamingReply
-                    ? <div><strong>Arama</strong><p>{streamingReply}</p></div>
+                    ? <div><strong>Nova</strong><p>{streamingReply}</p></div>
                     : <div className="typing"><i /><i /><i /></div>}</article>}
                 <div ref={endRef} />
               </div>

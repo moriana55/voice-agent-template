@@ -1,8 +1,8 @@
-# Arama — Multilingual Voice Operations Console
+# VoiceOps Studio — Multilingual Voice Operations Console
 
-Arama is a portfolio-grade voice-agent prototype for service businesses. It captures a customer request, extracts structured intent and missing details, speaks a response, and can persist a consent-aware call record across ten languages.
+VoiceOps Studio is a portfolio-grade voice-agent prototype for service businesses. It captures a customer request, extracts structured intent and missing details, speaks a response, and can persist a consent-aware call record across ten languages.
 
-![Arama voice operations console](docs/assets/arama-console.jpg)
+![VoiceOps Studio voice operations console](docs/assets/voiceops-studio-console.jpg)
 
 ## What it demonstrates
 
@@ -26,7 +26,7 @@ Arama is a portfolio-grade voice-agent prototype for service businesses. It capt
 | HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns | Verified |
 | Responsive UI | Browser-reviewed at 1440 px and 390 px without horizontal overflow | Verified |
 
-The verification date and release boundary are recorded in [`projects/arama-voice-agent/docs/delivery/system-state.yaml`](projects/arama-voice-agent/docs/delivery/system-state.yaml).
+The verification date and release boundary are recorded in [`projects/voiceops-studio/docs/delivery/system-state.yaml`](projects/voiceops-studio/docs/delivery/system-state.yaml).
 
 ## Architecture
 
@@ -123,7 +123,7 @@ See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY
 
 ## Current status and limits
 
-Arama is an actively developed portfolio prototype, not a deployed production service. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single local run and does not claim an SLA.
+VoiceOps Studio is an actively developed portfolio prototype, not a deployed production service. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single local run and does not claim an SLA.
 
 Fish Audio, Anthropic, OpenAI, and Twilio are third-party services. This repository is not affiliated with or endorsed by those providers.
 

@@ -1,6 +1,6 @@
 # LinkedIn draft
 
-I’ve been building **Arama**, a multilingual voice-operations prototype that turns customer speech into structured appointment, pricing, and support workflows.
+I’ve been building **VoiceOps Studio**, a multilingual voice-operations prototype that turns customer speech into structured appointment, pricing, and support workflows.
 
 The current version includes:
 
@@ -24,8 +24,8 @@ Repository: [ADD PUBLIC REPOSITORY URL AFTER CONFIRMATION]
 
 ## Recommended media
 
-1. Lead with `docs/assets/arama-console.jpg`.
+1. Lead with `docs/assets/voiceops-studio-console.jpg`.
 2. Add a 20–30 second screen recording: select Turkish, run the appointment scenario, switch to English, then show the structured call record.
-3. Use `docs/assets/arama-mobile.jpg` as the second image if posting a carousel.
+3. Use `docs/assets/voiceops-studio-mobile.jpg` as the second image if posting a carousel.
 
 Do not describe Fish Audio as a partner or sponsor. Safe wording: “live speech synthesis with Fish Audio S2 Pro.”

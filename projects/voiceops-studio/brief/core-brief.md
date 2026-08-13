@@ -1,4 +1,4 @@
-# Arama multilingual revision brief
+# VoiceOps Studio multilingual revision brief
 
 ## Objective
 

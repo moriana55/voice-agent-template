@@ -1,4 +1,4 @@
-# Arama operations runbook
+# VoiceOps Studio operations runbook
 
 This runbook covers the repository’s current deployment contract. Platform-specific commands, alert destinations, owners, and escalation contacts must be filled in before production use.
 

@@ -283,7 +283,7 @@ body {
 }
 .call-stage { min-height:780px; padding:clamp(1.5rem,3vw,2.75rem); background:var(--surface); }
 .call-stage::before {
-  content:"VOICE OPERATIONS / ARAMA SYSTEMS"; position:absolute; left:var(--space-5); bottom:var(--space-4);
+  content:"VOICEOPS STUDIO / LIVE SYSTEMS"; position:absolute; left:var(--space-5); bottom:var(--space-4);
   color:var(--muted); font:500 .58rem var(--font-mono); letter-spacing:.12em; opacity:.7;
 }
 .call-stage::after { width:44%; border-color:color-mix(in srgb,var(--ink) 10%,transparent); }

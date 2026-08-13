@@ -15,7 +15,7 @@ export type PresentationScenario = {
 const primaryCopy = {
   en: {
     skip: "Skip to content",
-    home: "Arama home",
+    home: "VoiceOps Studio home",
     exitPresentation: "Exit presentation",
     presentationMode: "Presentation mode",
     newCall: "Start a new call",
@@ -93,7 +93,7 @@ const primaryCopy = {
     retry: "Try again",
     export: "Download summary",
     notProvided: "Not provided",
-    summaryTitle: "ARAMA — Call Summary",
+    summaryTitle: "VOICEOPS STUDIO — Call Summary",
     duration: "Duration",
     intent: "Intent",
     summary: "Summary",
@@ -112,7 +112,7 @@ const primaryCopy = {
   },
   tr: {
     skip: "İçeriğe geç",
-    home: "Arama ana sayfa",
+    home: "VoiceOps Studio ana sayfa",
     exitPresentation: "Sunumdan çık",
     presentationMode: "Sunum modu",
     newCall: "Yeni görüşme başlat",
@@ -190,7 +190,7 @@ const primaryCopy = {
     retry: "Tekrar dene",
     export: "Özeti indir",
     notProvided: "Alınmadı",
-    summaryTitle: "ARAMA — Görüşme Özeti",
+    summaryTitle: "VOICEOPS STUDIO — Görüşme Özeti",
     duration: "Süre",
     intent: "Niyet",
     summary: "Özet",
@@ -359,11 +359,11 @@ export function initialMessages(locale: Locale): Message[] {
   return [{
     role: "assistant",
     content: ({
-      en: "Hello, this is Arama. How can I help you today?", tr: "Merhaba, ben Arama. Size nasıl yardımcı olabilirim?",
-      es: "Hola, soy Arama. ¿En qué puedo ayudarle hoy?", de: "Hallo, hier ist Arama. Wie kann ich Ihnen heute helfen?",
-      fr: "Bonjour, ici Arama. Comment puis-je vous aider aujourd’hui ?", it: "Buongiorno, sono Arama. Come posso aiutarla oggi?",
-      pt: "Olá, aqui é a Arama. Como posso ajudar hoje?", nl: "Hallo, u spreekt met Arama. Hoe kan ik u vandaag helpen?",
-      pl: "Dzień dobry, tu Arama. W czym mogę dziś pomóc?", ru: "Здравствуйте, это Arama. Чем я могу помочь?",
+      en: "Hello, this is Nova. How can I help you today?", tr: "Merhaba, ben Nova. Size nasıl yardımcı olabilirim?",
+      es: "Hola, soy Nova. ¿En qué puedo ayudarle hoy?", de: "Hallo, hier ist Nova. Wie kann ich Ihnen heute helfen?",
+      fr: "Bonjour, ici Nova. Comment puis-je vous aider aujourd’hui ?", it: "Buongiorno, sono Nova. Come posso aiutarla oggi?",
+      pt: "Olá, aqui é a Nova. Como posso ajudar hoje?", nl: "Hallo, u spreekt met Nova. Hoe kan ik u vandaag helpen?",
+      pl: "Dzień dobry, tu Nova. W czym mogę dziś pomóc?", ru: "Здравствуйте, это Nova. Чем я могу помочь?",
     } satisfies Record<Locale, string>)[locale],
   }];
 }

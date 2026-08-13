@@ -1,9 +1,9 @@
-project_id: arama-voice-agent
-name: Arama Multilingual Voice Agent
+project_id: voiceops-studio
+name: VoiceOps Studio
 mode: revise
 type: web-app
 status: implementation_verified
-repository: https://github.com/moriana55/voice-agent-template
+repository: https://github.com/moriana55/voiceops-studio
 working_directory: ../../
 creative_direction: preserve_existing_product_identity
 current_gate: 6

@@ -1,4 +1,4 @@
-# Arama - veri işleme notu
+# VoiceOps Studio - veri işleme notu
 
 Bu proje sesli müşteri talebini işleyen bir uygulamadır. Canlıya alınmadan önce
 işletmeye özel KVKK/GDPR metni ve hukuki dayanak ayrıca doğrulanmalıdır.
