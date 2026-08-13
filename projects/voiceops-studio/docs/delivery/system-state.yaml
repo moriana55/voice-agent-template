@@ -1,5 +1,5 @@
 revision: global-voice-operations-v2
-verified_on: 2026-08-13
+verified_on: 2026-08-14
 implementation:
   locale_count: 10
   locale_source: shared/i18n.ts
@@ -14,7 +14,7 @@ verification:
   production_http_smoke: passed
   production_smoke_checks: 10_passed
   browser_desktop: passed
-  browser_mobile_375px: passed_no_horizontal_overflow
+  browser_mobile_390px: passed_no_horizontal_overflow
   browser_dark_theme: passed
   browser_light_theme: passed
   interactive_locale_scenario: french_appointment_passed
