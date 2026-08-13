@@ -10,7 +10,9 @@ assert(ready.status === 200 && readyPayload.ready === true, `service not ready: 
 
 const body = new FormData();
 body.set("callId", crypto.randomUUID());
-body.set("consent", "true");
+body.set("turnId", crypto.randomUUID());
+body.set("noticeAcknowledged", "true");
+body.set("storageConsent", "false");
 body.set("locale", "tr");
 body.set("text", "Merhaba, fiyat bilgisi almak istiyorum.");
 body.set("history", "[]");
@@ -42,6 +44,7 @@ assert(types.has("audio"), "Fish audio stream missing");
 assert(doneEvent?.reply, "completed reply missing");
 assert(Number.isFinite(doneEvent?.firstAudioMs), "first audio latency missing");
 assert(!doneEvent?.audioWarning, `audio warning: ${doneEvent?.audioWarning}`);
+assert(doneEvent?.usageSeconds > 0, "usage meter result missing");
 
 console.log(JSON.stringify({
   ok: true,
@@ -49,4 +52,5 @@ console.log(JSON.stringify({
   eventTypes: [...types],
   firstAudioMs: doneEvent.firstAudioMs,
   latencyMs: doneEvent.latencyMs,
+  usageSeconds: doneEvent.usageSeconds,
 }));
