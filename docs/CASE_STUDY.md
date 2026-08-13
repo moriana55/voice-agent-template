@@ -41,11 +41,15 @@ The 1.02 s first-audio number visible in the screenshot is one observed local ru
 
 ### Desktop operations console
 
-![Desktop voice operations console](assets/voiceops-studio-console.jpg)
+![White-label desktop voice operations console with completed appointment record](assets/voiceops-product-console.png)
+
+### Protected usage and lead dashboard
+
+![Protected operations dashboard with active minutes and prepared lead records](assets/voiceops-admin-dashboard.png)
 
 ### Mobile presentation state
 
-<img src="assets/voiceops-studio-mobile.jpg" alt="Mobile VoiceOps Studio presentation console" width="390" />
+<img src="assets/voiceops-product-mobile.png" alt="Mobile white-label VoiceOps Studio presentation console" width="390" />
 
 ## Known limits
 

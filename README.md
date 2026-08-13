@@ -4,7 +4,7 @@ VoiceOps Studio is a productized, white-label voice-agent MVP for service busine
 
 **[Open the live demo](https://voiceops-studio-production.up.railway.app/#/present)** · [Read the case study](docs/CASE_STUDY.md)
 
-![VoiceOps Studio voice operations console](docs/assets/voiceops-studio-console.jpg)
+![White-label VoiceOps Studio console with a completed appointment workflow](docs/assets/voiceops-product-console.png)
 
 ## What it demonstrates
 
@@ -86,6 +86,8 @@ Open `http://localhost:5177/#/present`. The interface and deterministic scenario
 
 The protected operations view is available at `http://localhost:5177/#/admin`; enter `ADMIN_API_KEY` in the in-memory login form to view monthly usage and consented lead records.
 
+![VoiceOps Studio protected usage and lead dashboard](docs/assets/voiceops-admin-dashboard.png)
+
 To enable live speech, add `FISH_AUDIO_API_KEY` to `.env`. To enable open-ended model responses, also add either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Secret values stay server-side and `.env` is gitignored.
 
 ## Validate
@@ -135,7 +137,7 @@ See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY
 
 VoiceOps Studio has a public portfolio deployment and can be configured as a managed single-customer MVP. It is not a self-service multi-tenant SaaS or a production-readiness certification. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single smoke run and does not claim an SLA.
 
-The proposed commercial package, cost assumptions, billing basis, and scope boundary are documented in [`docs/COMMERCIAL_OFFER.md`](docs/COMMERCIAL_OFFER.md).
+The proposed commercial package, cost assumptions, billing basis, and scope boundary are documented in [`docs/COMMERCIAL_OFFER.md`](docs/COMMERCIAL_OFFER.md). The prepared 30-second portfolio walkthrough is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 
 Fish Audio, Anthropic, OpenAI, and Twilio are third-party services. This repository is not affiliated with or endorsed by those providers.
 

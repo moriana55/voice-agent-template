@@ -47,9 +47,10 @@ Repository: https://github.com/moriana55/voiceops-studio
 
 ## Önerilen medya
 
-1. İlk görsel: güncel masaüstü canlı konsolu.
-2. İkinci görsel: `/#/admin` ekranında sahte test verisiyle kullanım kartları; gerçek `ADMIN_API_KEY` görünmemeli.
-3. 25–35 saniyelik video: Türkçe randevu senaryosu → izinli çağrı kaydı → yönetim panelinde kullanım artışı → İngilizceye geçiş.
-4. İlk yorumda ürünleştirme kararı: “Per-turn rounding yerine aylık active-voice-seconds toplamı kullanıyorum.”
+1. İlk görsel: `docs/assets/voiceops-product-console.png` — müşteri markalı ve tamamlanmış randevu akışı.
+2. İkinci görsel: `docs/assets/voiceops-admin-dashboard.png` — sahte test verisiyle kullanım ve lead paneli; gerçek `ADMIN_API_KEY` görünmemeli.
+3. Üçüncü görsel: `docs/assets/voiceops-product-mobile.png` — 390 × 844 responsive ürün kanıtı.
+4. 30 saniyelik video: `docs/DEMO_SCRIPT.md` içindeki Türkçe randevu → izinli çağrı kaydı → yönetim panelinde kullanım artışı akışı.
+5. İlk yorumda ürünleştirme kararı: “Per-turn rounding yerine aylık active-voice-seconds toplamı kullanıyorum.”
 
 Fish Audio partner/sponsor gibi anlatılmamalı. Güvenli ifade: “live speech synthesis with Fish Audio S2 Pro.”
