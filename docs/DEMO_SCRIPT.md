@@ -1,5 +1,8 @@
 # VoiceOps Studio — 30 saniyelik LinkedIn demo akışı
 
+**Hazır video:** [`voiceops-linkedin-demo.mp4`](demo/voiceops-linkedin-demo.mp4)  
+**Tekrar üretmek için:** `./script/build-linkedin-demo.sh`
+
 ## Ana mesaj
 
 > Çok dilli bir ses demosunu, müşteriye kurulabilen ve kullanımı faturalandırılabilen yönetilen bir ürüne dönüştürdüm.

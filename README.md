@@ -137,7 +137,7 @@ See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY
 
 VoiceOps Studio has a public portfolio deployment and can be configured as a managed single-customer MVP. It is not a self-service multi-tenant SaaS or a production-readiness certification. Production use still requires organization-specific legal review, provider/data-processing review, secret rotation, external monitoring, load testing, backup/restore validation, and an incident process. The observed latency above is a single smoke run and does not claim an SLA.
 
-The proposed commercial package, cost assumptions, billing basis, and scope boundary are documented in [`docs/COMMERCIAL_OFFER.md`](docs/COMMERCIAL_OFFER.md). The prepared 30-second portfolio walkthrough is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+The proposed commercial package, cost assumptions, billing basis, and scope boundary are documented in [`docs/COMMERCIAL_OFFER.md`](docs/COMMERCIAL_OFFER.md). The prepared portfolio walkthrough includes a [ready-to-upload LinkedIn MP4](docs/demo/voiceops-linkedin-demo.mp4) and its reproducible [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) storyboard.
 
 Fish Audio, Anthropic, OpenAI, and Twilio are third-party services. This repository is not affiliated with or endorsed by those providers.
 

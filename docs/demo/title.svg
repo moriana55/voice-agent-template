@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <rect width="1080" height="1350" fill="#090c0b" fill-opacity="0.74"/>
+  <rect x="72" y="146" width="78" height="6" rx="3" fill="#f2762e"/>
+  <text x="72" y="225" fill="#f49a68" font-family="Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="4">VOICEOPS STUDIO</text>
+  <text x="72" y="353" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="72" font-weight="800">
+    <tspan x="72" dy="0">Sesli AI demosundan</tspan>
+    <tspan x="72" dy="86">satılabilir ürüne.</tspan>
+  </text>
+  <text x="72" y="585" fill="#b8b9b3" font-family="Arial, sans-serif" font-size="34">
+    <tspan x="72" dy="0">Müşteriye özel kurulum.</tspan>
+    <tspan x="72" dy="54">Ölçülebilir kullanım. Kontrollü maliyet.</tspan>
+  </text>
+  <g transform="translate(72 890)">
+    <rect width="936" height="216" rx="22" fill="#111614" stroke="#303832"/>
+    <text x="38" y="64" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="29" font-weight="700">10 DİL  ·  CANLI SES  ·  YAPILANDIRILMIŞ İŞ AKIŞI</text>
+    <text x="38" y="124" fill="#83d6b3" font-family="Arial, sans-serif" font-size="27">Sunucu taraflı dakika ölçümü + aylık maliyet kotası</text>
+    <text x="38" y="172" fill="#a8aaa5" font-family="Arial, sans-serif" font-size="24">React · Node.js · TypeScript · Fish Audio · Railway</text>
+  </g>
+</svg>
