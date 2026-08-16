@@ -54,6 +54,24 @@ A direct adapter needs contract tests, fail-closed credential checks, tenant-iso
 8. Create and restore a backup, run the monitoring failure simulation, and record the deployed revision plus rollback artifact.
 9. Obtain customer acceptance, then enable traffic and monitor the first controlled calls.
 
+## Executable launch evidence
+
+The checklist above is enforced by `npm run launch:gate`. Copy [`launch-evidence.example.json`](launch-evidence.example.json) outside the repository, bind it to the exact approved customer HTTPS origin, replace every pending item only after the named owner has produced dated evidence, and set `APP_REVISION` in the customer environment to the exact reviewed 40-character git commit SHA. The gate checks the command target against that approved origin before reading the admin key, and deliberately rejects the public portfolio environment, fallback provider modes, incomplete customer approvals, missing selected integrations, ephemeral sessions, unencrypted records, revision drift, and local fixture backups.
+
+Keep `ADMIN_API_KEY` and the backup passphrase in separate permission-`0600` files. Then run:
+
+```bash
+npm run launch:gate -- \
+  --base-url https://customer-voice.example.com \
+  --admin-key-file /secure/secrets/customer-admin.key \
+  --evidence /secure/evidence/customer-launch.json \
+  --backup /secure/offsite/customer-latest.vopsbackup \
+  --backup-key-file /secure/secrets/customer-backup.key \
+  --output /secure/evidence/customer-launch-report.json
+```
+
+The encrypted backup must have been streamed from the Railway volume, be at most 24 hours old by default, and pass checksum, AES-GCM authentication, archive-path, and archive-type verification. Use `--backup-max-age-hours` only to set an explicitly approved value from 1 to 168 hours. The output is a non-secret, permission-`0600` report containing the target origin, evidence hash, reviewed revision, backup checksum, and each pass/fail result. The command refuses to overwrite an existing report and exits non-zero on any failed gate. A green report is necessary but does not replace the recorded approvals referenced by the evidence file.
+
 ## Launch blockers in the current public environment
 
 - Railway native backup/PITR is unavailable on the current Hobby workspace; the Backups screen requires Pro.
