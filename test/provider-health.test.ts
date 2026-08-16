@@ -1,13 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  preflightConfiguredBrainProviders,
+  preflightConfiguredProviders,
   providerAvailable,
   providerHealthSnapshot,
   resetProviderHealth,
 } from "../server/provider-health";
 
-const envNames = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "PROVIDER_PREFLIGHT_TIMEOUT_MS"] as const;
+const envNames = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "FISH_AUDIO_API_KEY",
+  "PROVIDER_PREFLIGHT_TIMEOUT_MS",
+] as const;
 
 function preserveEnv() {
   return Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
@@ -27,13 +32,14 @@ test("provider preflight geçersiz Anthropic anahtarını readiness için kapat�
   try {
     process.env.ANTHROPIC_API_KEY = "invalid-anthropic-key";
     delete process.env.OPENAI_API_KEY;
+    delete process.env.FISH_AUDIO_API_KEY;
     let capturedAuthorization = "";
     const fakeFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
       capturedAuthorization = new Headers(init?.headers).get("x-api-key") || "";
       return new Response('{"type":"error"}', { status: 401 });
     }) as typeof fetch;
 
-    const result = await preflightConfiguredBrainProviders(fakeFetch);
+    const result = await preflightConfiguredProviders(fakeFetch);
 
     assert.deepEqual(result, [{
       provider: "anthropic",
@@ -54,13 +60,14 @@ test("provider preflight sağlıklı OpenAI anahtarını doğrular", async () =>
   try {
     delete process.env.ANTHROPIC_API_KEY;
     process.env.OPENAI_API_KEY = "valid-openai-key";
+    delete process.env.FISH_AUDIO_API_KEY;
     let capturedAuthorization = "";
     const fakeFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
       capturedAuthorization = new Headers(init?.headers).get("authorization") || "";
       return new Response('{"object":"list","data":[]}', { status: 200 });
     }) as typeof fetch;
 
-    const result = await preflightConfiguredBrainProviders(fakeFetch);
+    const result = await preflightConfiguredProviders(fakeFetch);
 
     assert.equal(result[0]?.healthy, true);
     assert.equal(capturedAuthorization, "Bearer valid-openai-key");
@@ -77,12 +84,13 @@ test("provider preflight ağ hatasında fail-closed davranır ve sırları logla
   try {
     process.env.ANTHROPIC_API_KEY = "do-not-log-this-secret";
     delete process.env.OPENAI_API_KEY;
+    delete process.env.FISH_AUDIO_API_KEY;
     console.error = (...values: unknown[]) => logs.push(values.map(String).join(" "));
     const fakeFetch = (async () => {
       throw new TypeError("network unavailable");
     }) as typeof fetch;
 
-    const result = await preflightConfiguredBrainProviders(fakeFetch);
+    const result = await preflightConfiguredProviders(fakeFetch);
 
     assert.equal(result[0]?.healthy, false);
     assert.equal(result[0]?.status, null);
@@ -99,14 +107,65 @@ test("provider preflight yapılandırılmamış sağlayıcı için dış istek y
   try {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.FISH_AUDIO_API_KEY;
     let calls = 0;
     const fakeFetch = (async () => {
       calls += 1;
       return new Response(null, { status: 200 });
     }) as typeof fetch;
 
-    assert.deepEqual(await preflightConfiguredBrainProviders(fakeFetch), []);
+    assert.deepEqual(await preflightConfiguredProviders(fakeFetch), []);
     assert.equal(calls, 0);
+  } finally {
+    restoreEnv(previous);
+  }
+});
+
+test("provider preflight Fish kimliğini ve kullanılabilir krediyi doğrular", async () => {
+  const previous = preserveEnv();
+  try {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    process.env.FISH_AUDIO_API_KEY = "valid-fish-key";
+    let capturedUrl = "";
+    let capturedAuthorization = "";
+    const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      capturedUrl = String(input);
+      capturedAuthorization = new Headers(init?.headers).get("authorization") || "";
+      return new Response('{"credit":"1.25","has_free_credit":false}', { status: 200 });
+    }) as typeof fetch;
+
+    const result = await preflightConfiguredProviders(fakeFetch);
+
+    assert.deepEqual(result, [{
+      provider: "fishAudio",
+      configured: true,
+      healthy: true,
+      status: 200,
+    }]);
+    assert.match(capturedUrl, /wallet\/self\/api-credit\?check_free_credit=true$/);
+    assert.equal(capturedAuthorization, "Bearer valid-fish-key");
+    assert.equal(providerAvailable("fishAudio", true), true);
+  } finally {
+    restoreEnv(previous);
+  }
+});
+
+test("provider preflight kredisiz Fish hesabını hazır saymaz", async () => {
+  const previous = preserveEnv();
+  try {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    process.env.FISH_AUDIO_API_KEY = "no-credit-fish-key";
+    const fakeFetch = (async () => new Response(
+      '{"credit":"0","has_free_credit":false}',
+      { status: 200 },
+    )) as typeof fetch;
+
+    const result = await preflightConfiguredProviders(fakeFetch);
+
+    assert.equal(result[0]?.healthy, false);
+    assert.equal(providerAvailable("fishAudio", true), false);
   } finally {
     restoreEnv(previous);
   }

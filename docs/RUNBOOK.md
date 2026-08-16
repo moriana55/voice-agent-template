@@ -21,7 +21,7 @@ The production SLO, monitor, incident-routing, and privacy contract is documente
 - Railway volume mount: `/app/data` with `DATA_DIR=/app/data`
 - Container startup normalizes ownership only on `/app/data`, then drops to the unprivileged `node` user before starting the service.
 - Production readiness responses expose only the boolean `ready`; inspect structured logs and the authenticated operations view for diagnostics.
-- At startup, each configured Anthropic/OpenAI key is verified with a bounded model-list request. A `provider_preflight` log with `healthy:false` means readiness is intentionally closed; rotate or correct the credential, confirm provider reachability, and redeploy. Logs contain provider, HTTP status, and timing but never the key or response body.
+- At startup, each configured Anthropic/OpenAI key is verified with a bounded model-list request, and Fish Audio is verified with its authenticated credit endpoint. A `provider_preflight` log with `healthy:false` means readiness is intentionally closed; rotate or correct the credential, fund the Fish account if needed, confirm provider reachability, and redeploy. Logs contain provider, HTTP status, and timing but never keys, balances, or response bodies.
 - On `SIGTERM`/`SIGINT`, readiness turns false, new connections stop, and active requests get up to `GRACEFUL_SHUTDOWN_MS` (default 9000 ms) to finish before forced termination.
 
 ## Runtime modes

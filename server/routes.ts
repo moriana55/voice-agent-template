@@ -66,7 +66,7 @@ import { assertValidUploadedAudio, supportedAudioMimeTypes } from "./audio-valid
 import { publicStreamErrorMessage } from "./error-safety";
 import { isServerDraining } from "./lifecycle";
 import {
-  preflightConfiguredBrainProviders,
+  preflightConfiguredProviders,
   providerAvailable,
   setProviderHealth,
   type ProviderName,
@@ -455,7 +455,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
-  await preflightConfiguredBrainProviders();
+  await preflightConfiguredProviders();
   await initializeWebSessions();
   await registerTelephonyRoutes(app);
   await pruneExpiredRecords();
