@@ -23,14 +23,14 @@ Repository history attributes the current implementation to Yiğit Ertürk. The 
 5. Paid-customer readiness is an explicit runtime gate: missing business identity, privacy contact, encryption, provider intelligence, origins, admin access, or a monthly hard limit makes readiness fail.
 6. Usage is metered server-side as active voice seconds and summarized monthly without retaining raw audio or plaintext call identifiers.
 
-## Evidence snapshot — 2026-08-14
+## Evidence snapshot — 2026-08-16
 
 | Evidence | Result |
 | --- | --- |
 | TypeScript check | Passed |
-| Automated tests | 23 passed |
+| Automated tests | 64 passed |
 | Production build | Passed |
-| Production HTTP/Twilio smoke | Passed, 13 checks |
+| Production HTTP/Twilio smoke | Passed, 14 checks |
 | Fish Audio MP3 generation | Passed |
 | Desktop browser review | Passed at 1440 × 900 |
 | Mobile browser review | Passed at 390 × 844 with no horizontal overflow |

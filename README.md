@@ -25,9 +25,9 @@ VoiceOps Studio is a productized, white-label voice-agent MVP for service busine
 | Ten-language intent flow | Shared locale contract plus automated appointment extraction tests for all ten locales | Verified |
 | Fish Audio TTS | Real MP3 response reproduced locally with Fish Audio S2 Pro | Verified |
 | First audio | 1.46 s observed in one Railway production smoke run on 2026-08-14; environment-dependent, not a benchmark | Observed |
-| Automated validation | `npm test` → 46 passing tests | Verified |
+| Automated validation | `npm test` → 64 passing tests | Verified |
 | Production bundle | `npm run check` and `npm run build` pass on Node 22 | Verified |
-| HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns | Verified |
+| HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns (14 checks) | Verified |
 | Responsive UI | Browser-reviewed at 1440 px and 390 px without horizontal overflow | Verified |
 
 The verification date and release boundary are recorded in [`projects/voiceops-studio/docs/delivery/system-state.yaml`](projects/voiceops-studio/docs/delivery/system-state.yaml).

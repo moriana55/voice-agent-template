@@ -1,6 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350">
-  <rect x="42" y="1120" width="996" height="170" rx="22" fill="#090c0b" fill-opacity="0.94" stroke="#343a35"/>
-  <text x="76" y="1180" fill="#f49a68" font-family="Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="3">02 / YAPILANDIRILMIŞ SONUÇ</text>
-  <text x="76" y="1232" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="34" font-weight="800">Randevu, fiyat ve destek talepleri lead’e dönüşür.</text>
-  <text x="76" y="1271" fill="#83d6b3" font-family="Arial, sans-serif" font-size="22">Ayrı kayıt izni · şifreli saklama · süreli silme</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <rect width="1080" height="360" fill="#090c0b"/>
+  <rect x="72" y="68" width="70" height="6" rx="3" fill="#f2762e"/>
+  <text x="72" y="126" fill="#f49a68" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="3">02 / STRUCTURED OUTCOME</text>
+  <text x="72" y="222" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="62" font-weight="800">From conversation</text>
+  <text x="72" y="294" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="62" font-weight="800">to operational data.</text>
+  <rect x="58" y="376" width="964" height="742" rx="28" fill="none" stroke="#343a35" stroke-width="3"/>
+  <g transform="translate(72 1170)">
+    <rect width="936" height="120" rx="22" fill="#111614" stroke="#343a35"/>
+    <text x="30" y="48" fill="#f49a68" font-family="Arial, sans-serif" font-size="22" font-weight="700">READY FOR HANDOFF</text>
+    <text x="30" y="88" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="30" font-weight="700">Appointment · tomorrow 15:00 · CRM / calendar</text>
+  </g>
 </svg>

@@ -1,6 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350">
-  <rect x="42" y="1120" width="996" height="170" rx="22" fill="#090c0b" fill-opacity="0.94" stroke="#343a35"/>
-  <text x="76" y="1180" fill="#f49a68" font-family="Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="3">03 / ÖLÇÜLEBİLİR ÜRÜN</text>
-  <text x="76" y="1232" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="34" font-weight="800">Dakika, görüşme ve paket aşımı raporlanır.</text>
-  <text x="76" y="1271" fill="#83d6b3" font-family="Arial, sans-serif" font-size="22">Aylık sert kota sağlayıcı maliyetini sınırlar</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <rect width="1080" height="1350" fill="#090c0b" fill-opacity="0.88"/>
+  <rect x="72" y="84" width="70" height="6" rx="3" fill="#f2762e"/>
+  <text x="72" y="145" fill="#f49a68" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="3">03 / SERVER-SIDE OPERATIONS</text>
+  <text x="72" y="255" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="66" font-weight="800">Usage and risk</text>
+  <text x="72" y="330" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="66" font-weight="800">stay visible.</text>
+  <g transform="translate(72 470)">
+    <rect width="288" height="230" rx="24" fill="#111614" stroke="#3b433d"/>
+    <text x="28" y="72" fill="#f49a68" font-family="Arial, sans-serif" font-size="22" font-weight="700">ACTIVE VOICE</text>
+    <text x="28" y="142" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="58" font-weight="800">1 min</text>
+    <text x="28" y="188" fill="#a8aaa5" font-family="Arial, sans-serif" font-size="22">Demo evidence</text>
+  </g>
+  <g transform="translate(396 470)">
+    <rect width="288" height="230" rx="24" fill="#111614" stroke="#3b433d"/>
+    <text x="28" y="72" fill="#f49a68" font-family="Arial, sans-serif" font-size="22" font-weight="700">CALLS</text>
+    <text x="28" y="142" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="58" font-weight="800">5</text>
+    <text x="28" y="188" fill="#a8aaa5" font-family="Arial, sans-serif" font-size="22">Seven turns</text>
+  </g>
+  <g transform="translate(720 470)">
+    <rect width="288" height="230" rx="24" fill="#111614" stroke="#3b433d"/>
+    <text x="28" y="72" fill="#f49a68" font-family="Arial, sans-serif" font-size="22" font-weight="700">OVERAGE</text>
+    <text x="28" y="142" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="58" font-weight="800">0 TL</text>
+    <text x="28" y="188" fill="#a8aaa5" font-family="Arial, sans-serif" font-size="22">Hard limit active</text>
+  </g>
+  <g transform="translate(72 790)">
+    <rect width="936" height="108" rx="22" fill="#111614" stroke="#343a35"/>
+    <circle cx="42" cy="54" r="12" fill="#83d6b3"/>
+    <text x="78" y="66" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="31" font-weight="700">Explicit recording consent</text>
+  </g>
+  <g transform="translate(72 924)">
+    <rect width="936" height="108" rx="22" fill="#111614" stroke="#343a35"/>
+    <circle cx="42" cy="54" r="12" fill="#83d6b3"/>
+    <text x="78" y="66" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="31" font-weight="700">Timed retention and encrypted records</text>
+  </g>
+  <g transform="translate(72 1058)">
+    <rect width="936" height="108" rx="22" fill="#111614" stroke="#343a35"/>
+    <circle cx="42" cy="54" r="12" fill="#83d6b3"/>
+    <text x="78" y="66" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="31" font-weight="700">Monthly usage metering and hard cost limits</text>
+  </g>
+  <text x="72" y="1265" fill="#777d78" font-family="Arial, sans-serif" font-size="22">Prepared demo data · not production metrics</text>
 </svg>

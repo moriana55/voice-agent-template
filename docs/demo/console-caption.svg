@@ -1,6 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350">
-  <rect x="42" y="1120" width="996" height="170" rx="22" fill="#090c0b" fill-opacity="0.94" stroke="#343a35"/>
-  <text x="76" y="1180" fill="#f49a68" font-family="Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="3">01 / MÜŞTERİ AKIŞI</text>
-  <text x="76" y="1232" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="34" font-weight="800">Konuşur, eksik bilgiyi toplar, işi tamamlar.</text>
-  <text x="76" y="1271" fill="#a8aaa5" font-family="Arial, sans-serif" font-size="22">Hazırlanmış demo verisi · gerçek müşteri bilgisi içermez</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <rect width="1080" height="326" fill="#090c0b"/>
+  <rect x="72" y="68" width="70" height="6" rx="3" fill="#f2762e"/>
+  <text x="72" y="126" fill="#f49a68" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="3">01 / LIVE CUSTOMER FLOW</text>
+  <text x="72" y="214" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="58" font-weight="800">Understands the request.</text>
+  <text x="72" y="280" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="58" font-weight="800">Asks for what is missing.</text>
+  <rect x="58" y="330" width="964" height="958" rx="28" fill="none" stroke="#343a35" stroke-width="3"/>
+  <g transform="translate(72 1295)">
+    <circle cx="10" cy="-8" r="7" fill="#83d6b3"/>
+    <text x="30" y="0" fill="#b8b9b3" font-family="Arial, sans-serif" font-size="22">Customer: tomorrow at 3 PM · Nova: “May I have your full name?”</text>
+  </g>
 </svg>

@@ -1,5 +1,5 @@
 revision: global-voice-operations-v2
-verified_on: 2026-08-14
+verified_on: 2026-08-16
 implementation:
   locale_count: 10
   locale_source: shared/i18n.ts
@@ -9,10 +9,10 @@ implementation:
   persisted_locale: true
 verification:
   typecheck: passed
-  automated_tests: 18_passed
+  automated_tests: 64_passed
   production_build: passed
   production_http_smoke: passed
-  production_smoke_checks: 10_passed
+  production_smoke_checks: 14_passed
   browser_desktop: passed
   browser_mobile_390px: passed_no_horizontal_overflow
   browser_dark_theme: passed
