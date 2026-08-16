@@ -14,9 +14,25 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { railwayArchiveArgs } from "../script/encrypted-backup.mjs";
 
 const execFileAsync = promisify(execFile);
 const backupScript = path.resolve("script/encrypted-backup.mjs");
+
+test("Railway backup komutu SSH seçeneklerini remote tar komutundan ayırır", () => {
+  assert.deepEqual(railwayArchiveArgs("/app/data", "/secure/railway.key"), [
+    "ssh",
+    "--identity-file",
+    path.resolve("/secure/railway.key"),
+    "--",
+    "tar",
+    "-czf",
+    "-",
+    "-C",
+    "/app/data",
+    ".",
+  ]);
+});
 
 async function runBackup(...args: string[]) {
   const result = await execFileAsync(process.execPath, [backupScript, ...args], {
@@ -109,6 +125,16 @@ test("şifreli volume backup doğrulanır, bozulma reddedilir ve izole dizine ge
         "--key-file", keyFile,
       ),
       /symbolic link/i,
+    );
+
+    const identityLink = path.join(root, "railway-identity-link");
+    await symlink(keyFile, identityLink);
+    await assert.rejects(
+      runBackup(
+        "create-railway", "--output", path.join(root, "railway.vopsbackup"),
+        "--key-file", keyFile, "--identity-file", identityLink,
+      ),
+      /identity path must be a regular file/i,
     );
   } finally {
     await rm(root, { recursive: true, force: true });
