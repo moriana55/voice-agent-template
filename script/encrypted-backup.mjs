@@ -374,11 +374,28 @@ export async function createLocalBackup({ source, outputPath, keyFile }) {
   }
 }
 
-export async function createRailwayBackup({ outputPath, keyFile, mountPath = "/app/data" }) {
+export function railwayArchiveArgs(mountPath, identityFile) {
+  const args = ["ssh"];
+  if (identityFile) args.push("--identity-file", path.resolve(identityFile));
+  args.push("--", "tar", "-czf", "-", "-C", mountPath, ".");
+  return args;
+}
+
+async function validateIdentityFile(identityFile) {
+  if (!identityFile) return;
+  const file = await lstat(identityFile);
+  if (!file.isFile() || file.isSymbolicLink()) fail("Railway SSH identity path must be a regular file.");
+  if (process.platform !== "win32" && (file.mode & 0o077) !== 0) {
+    fail("Railway SSH identity file must not be readable or writable by group/others (chmod 600).");
+  }
+}
+
+export async function createRailwayBackup({ outputPath, keyFile, mountPath = "/app/data", identityFile }) {
   if (!mountPath.startsWith("/") || mountPath.includes("..")) fail("Railway mount path is invalid.");
   if (await pathExists(`${outputPath}.manifest.json`)) fail("Backup manifest already exists.");
+  await validateIdentityFile(identityFile);
   const passphrase = await readPassphrase(keyFile);
-  const child = spawn("railway", ["ssh", "tar", "-czf", "-", "-C", mountPath, "."], {
+  const child = spawn("railway", railwayArchiveArgs(mountPath, identityFile), {
     stdio: ["ignore", "pipe", "pipe"],
   });
   const childResult = processResult(child, "Railway volume archive");
@@ -457,6 +474,7 @@ async function main() {
       outputPath: required(options, "output"),
       keyFile: required(options, "key-file"),
       mountPath: options["mount-path"] || "/app/data",
+      identityFile: options["identity-file"],
     });
   } else if (command === "verify") {
     result = await verifyBackup({

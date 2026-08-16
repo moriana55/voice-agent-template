@@ -50,10 +50,11 @@ Run:
 npm run backup -- create-railway \
   --output /secure/offsite/voiceops-$(date -u +%Y%m%dT%H%M%SZ).vopsbackup \
   --key-file /secure/secrets/voiceops-backup.key \
+  --identity-file ~/.ssh/id_ed25519_railway_voiceops \
   --mount-path /app/data
 ```
 
-The process executes `tar` inside the service and encrypts stdout locally. No plaintext archive is created. Copy both the `.vopsbackup` file and its `.manifest.json` file to the approved target.
+The process executes `tar` inside the service and encrypts stdout locally. No plaintext archive is created. `--identity-file` is optional when Railway can unambiguously select a registered personal key; use a permission-`0600` dedicated workspace key when personal and workspace key scopes differ. Copy both the `.vopsbackup` file and its `.manifest.json` file to the approved target.
 
 ## Verify and restore drill
 
