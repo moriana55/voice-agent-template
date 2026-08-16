@@ -25,7 +25,7 @@ export function providerHealthSnapshot() {
 }
 
 export type ProviderPreflightResult = {
-  provider: "anthropic" | "openai";
+  provider: ProviderName;
   configured: true;
   healthy: boolean;
   status: number | null;
@@ -37,16 +37,19 @@ function preflightTimeoutMs() {
 }
 
 async function probe(
-  provider: "anthropic" | "openai",
+  provider: ProviderName,
   apiKey: string,
   fetchImpl: typeof fetch,
 ): Promise<ProviderPreflightResult> {
   const startedAt = Date.now();
   try {
+    const url = provider === "anthropic"
+      ? "https://api.anthropic.com/v1/models?limit=1"
+      : provider === "openai"
+        ? "https://api.openai.com/v1/models"
+        : "https://api.fish.audio/wallet/self/api-credit?check_free_credit=true";
     const response = await fetchImpl(
-      provider === "anthropic"
-        ? "https://api.anthropic.com/v1/models?limit=1"
-        : "https://api.openai.com/v1/models",
+      url,
       {
         headers: provider === "anthropic"
           ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
@@ -54,16 +57,22 @@ async function probe(
         signal: AbortSignal.timeout(preflightTimeoutMs()),
       },
     );
-    setProviderHealth(provider, response.ok);
+    let healthy = response.ok;
+    if (provider === "fishAudio" && response.ok) {
+      const wallet = await response.json() as { credit?: string; has_free_credit?: boolean };
+      const credit = Number(wallet.credit);
+      healthy = (Number.isFinite(credit) && credit > 0) || wallet.has_free_credit === true;
+    }
+    setProviderHealth(provider, healthy);
     console.log(JSON.stringify({
-      level: response.ok ? "info" : "error",
+      level: healthy ? "info" : "error",
       event: "provider_preflight",
       provider,
-      healthy: response.ok,
+      healthy,
       status: response.status,
       durationMs: Date.now() - startedAt,
     }));
-    return { provider, configured: true, healthy: response.ok, status: response.status };
+    return { provider, configured: true, healthy, status: response.status };
   } catch (error) {
     setProviderHealth(provider, false);
     console.error(JSON.stringify({
@@ -79,11 +88,13 @@ async function probe(
   }
 }
 
-export async function preflightConfiguredBrainProviders(fetchImpl: typeof fetch = fetch) {
+export async function preflightConfiguredProviders(fetchImpl: typeof fetch = fetch) {
   const probes: Array<Promise<ProviderPreflightResult>> = [];
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
   const openaiKey = process.env.OPENAI_API_KEY?.trim();
+  const fishAudioKey = process.env.FISH_AUDIO_API_KEY?.trim();
   if (anthropicKey) probes.push(probe("anthropic", anthropicKey, fetchImpl));
   if (openaiKey) probes.push(probe("openai", openaiKey, fetchImpl));
+  if (fishAudioKey) probes.push(probe("fishAudio", fishAudioKey, fetchImpl));
   return Promise.all(probes);
 }
