@@ -7,18 +7,26 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
       - run: npm run check
+      - run: npm run lint
       - run: npm test
       - run: npm run build
       - name: Start isolated production smoke server
@@ -29,13 +37,14 @@ jobs:
           OPENAI_API_KEY: ""
           ANTHROPIC_API_KEY: ""
           FISH_AUDIO_API_KEY: ""
-          ADMIN_API_KEY: smoke-admin
-          DATA_ENCRYPTION_KEY: ci-only-smoke-encryption-key
+          ADMIN_API_KEY: ci-smoke-admin-key-01234567890123456789
+          DATA_ENCRYPTION_KEY: ci-smoke-encryption-key-0123456789012345
           DATA_DIR: ${{ runner.temp }}/voiceops-smoke-data
           TWILIO_AUTH_TOKEN: smoke-twilio
           TELEPHONY_RECORD_STORAGE: enabled
           PUBLIC_BASE_URL: ""
           ALLOWED_ORIGINS: http://127.0.0.1:5193
+          WEB_REPLICA_COUNT: "1"
         run: |
           node dist/index.cjs > "${RUNNER_TEMP}/voiceops-smoke.log" 2>&1 &
           echo $! > "${RUNNER_TEMP}/voiceops-smoke.pid"
@@ -50,12 +59,22 @@ jobs:
       - name: Verify production HTTP and Twilio paths
         env:
           SMOKE_BASE_URL: http://127.0.0.1:5193
-          SMOKE_ADMIN_KEY: smoke-admin
+          SMOKE_ADMIN_KEY: ci-smoke-admin-key-01234567890123456789
           SMOKE_TWILIO_TOKEN: smoke-twilio
         run: npm run smoke:http
       - name: Stop smoke server
         if: always()
         run: |
           if test -f "${RUNNER_TEMP}/voiceops-smoke.pid"; then
-            kill "$(cat "${RUNNER_TEMP}/voiceops-smoke.pid")" || true
+            smoke_pid="$(cat "${RUNNER_TEMP}/voiceops-smoke.pid")"
+            kill "${smoke_pid}" || true
+            for attempt in {1..12}; do
+              if ! kill -0 "${smoke_pid}" 2>/dev/null; then
+                exit 0
+              fi
+              sleep 1
+            done
+            cat "${RUNNER_TEMP}/voiceops-smoke.log"
+            kill -KILL "${smoke_pid}" || true
+            exit 1
           fi

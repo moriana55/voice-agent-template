@@ -11,9 +11,15 @@ This runbook covers the repository’s current deployment contract. Platform-spe
 - Browser status: `GET /api/status`
 - Public white-label config: `GET /api/product`
 - Protected usage report: `GET /api/admin/usage?period=YYYY-MM`
+- Protected integration readiness: `GET /api/admin/integrations`
+- Protected outbound call: `POST /api/admin/telephony/outbound`
+- Protected subscription Checkout: `POST /api/admin/billing/checkout`
+- Stripe webhook: `POST /api/integrations/stripe/webhook`
 - Persistent data: `DATA_DIR/call-records.jsonl` when `RECORD_STORAGE` is enabled
 - Railway volume mount: `/app/data` with `DATA_DIR=/app/data`
 - Container startup normalizes ownership only on `/app/data`, then drops to the unprivileged `node` user before starting the service.
+- Production readiness responses expose only the boolean `ready`; inspect structured logs and the authenticated operations view for diagnostics.
+- On `SIGTERM`/`SIGINT`, readiness turns false, new connections stop, and active requests get up to `GRACEFUL_SHUTDOWN_MS` (default 9000 ms) to finish before forced termination.
 
 ## Runtime modes
 
@@ -29,13 +35,16 @@ The mode reflects runtime provider results after a request, not only whether a k
 
 1. Run `npm ci`, `npm run check`, `npm test`, and `npm run build`.
 2. Provide required secrets through the deployment platform; never bake `.env` into an image.
-3. Set `DATA_ENCRYPTION_KEY` and `ADMIN_API_KEY` when records are enabled.
-4. Set `PUBLIC_BASE_URL` and `TWILIO_AUTH_TOKEN` before enabling telephone traffic.
-5. Set `USAGE_HARD_LIMIT_MINUTES` to a positive contractual ceiling for paid customers.
-6. Keep `TELEPHONY_RECORD_STORAGE=disabled` until the customer's recording basis and notice are approved.
-7. Verify liveness, readiness, one acknowledged browser turn, one separately consented saved record, one rejected non-acknowledged turn, one usage report, and one signed Twilio request.
-8. Confirm log ingestion and alert delivery in the target platform.
-9. Record the deployed git revision and the previous known-good artifact.
+3. Set `DATA_ENCRYPTION_KEY` and `ADMIN_API_KEY` when records are enabled. Production startup rejects unencrypted record storage.
+4. Set `PUBLIC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` before enabling telephone traffic.
+5. Set `USAGE_HARD_LIMIT_MINUTES` to a positive contractual ceiling and tune `TURN_MAX_CONCURRENCY`. Production startup rejects live provider credentials without a positive ceiling and `ALLOWED_ORIGINS`.
+6. Put every generic CRM/calendar webhook hostname in `INTEGRATION_WEBHOOK_ALLOWED_HOSTS`; production rejects HTTP, private/loopback literals, redirects, missing tokens, and non-allowlisted hosts.
+7. Keep `WEB_REPLICA_COUNT=1` while web sessions use process memory. A shared session store is required before horizontal scaling.
+8. Keep `TELEPHONY_RECORD_STORAGE=disabled` until the customer's recording basis and notice are approved.
+9. Verify liveness, readiness, one acknowledged browser turn, one separately consented saved record, one rejected non-acknowledged turn, one usage report, one signed Twilio request, and every configured integration shown as ready in the operations view.
+10. Send a staged `SIGTERM` and confirm `shutdown_started` followed by a non-forced `shutdown_completed` event.
+11. Confirm log ingestion and alert delivery in the target platform.
+12. Record the deployed git revision and the previous known-good artifact.
 
 ## Common incidents
 

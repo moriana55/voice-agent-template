@@ -15,6 +15,7 @@ VoiceOps Studio is a productized, white-label voice-agent MVP for service busine
 - Consent enforcement, optional AES-256-GCM record encryption, retention controls, admin authorization, and privacy-safe request logging.
 - Environment-driven customer branding, plan configuration, active-voice metering, monthly hard limits, and a protected operations dashboard.
 - Locale-aware Twilio voice webhooks with signature verification and `<Play>`/`<Say>` fallback behavior.
+- Protected outbound Twilio calls, Google Calendar event creation, HubSpot contact upsert, and Stripe subscription Checkout/webhook flows.
 - A responsive presentation console with light/dark themes and explicit live/degraded service state.
 
 ## Verified evidence
@@ -24,7 +25,7 @@ VoiceOps Studio is a productized, white-label voice-agent MVP for service busine
 | Ten-language intent flow | Shared locale contract plus automated appointment extraction tests for all ten locales | Verified |
 | Fish Audio TTS | Real MP3 response reproduced locally with Fish Audio S2 Pro | Verified |
 | First audio | 1.46 s observed in one Railway production smoke run on 2026-08-14; environment-dependent, not a benchmark | Observed |
-| Automated validation | `npm test` → 23 passing tests | Verified |
+| Automated validation | `npm test` → 46 passing tests | Verified |
 | Production bundle | `npm run check` and `npm run build` pass on Node 22 | Verified |
 | HTTP/telephony workflow | Production smoke test covers health, consent, records, admin auth, Twilio signature, TwiML, and phone turns | Verified |
 | Responsive UI | Browser-reviewed at 1440 px and 390 px without horizontal overflow | Verified |
@@ -44,7 +45,9 @@ flowchart LR
     F --> G
     G --> H[Streaming browser audio or TwiML]
     D --> I[Encrypted call record]
-    I --> J[Optional CRM / calendar webhooks]
+    I --> J[Google Calendar / HubSpot / signed webhooks]
+    B --> K[Twilio outbound calls]
+    B --> L[Stripe Checkout + verified webhooks]
 ```
 
 Important implementation paths:
@@ -54,6 +57,7 @@ Important implementation paths:
 - [`server/routes.ts`](server/routes.ts) — browser API, streaming, provider health, and fail-soft behavior
 - [`server/telephony.ts`](server/telephony.ts) — signed Twilio voice workflow
 - [`server/records.ts`](server/records.ts) — retention, encrypted records, and integrations
+- [`server/integrations.ts`](server/integrations.ts) — Twilio, Google Calendar, HubSpot, Stripe, and generic webhook adapters
 - [`server/usage.ts`](server/usage.ts) — server-side active-voice metering, summaries, and monthly quota enforcement
 - [`server/product.ts`](server/product.ts) — safe public white-label configuration and paid-customer readiness gate
 - [`client/src/App.tsx`](client/src/App.tsx) — recording, interruption, streaming playback, and operator UI
@@ -86,6 +90,8 @@ Open `http://localhost:5177/#/present`. The interface and deterministic scenario
 
 The protected operations view is available at `http://localhost:5177/#/admin`; enter `ADMIN_API_KEY` in the in-memory login form to view monthly usage and consented lead records.
 
+The same view reports provider readiness, starts protected outbound test calls, and creates Stripe subscription Checkout sessions. See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for provider setup and webhook URLs.
+
 ![VoiceOps Studio protected usage and lead dashboard](docs/assets/voiceops-admin-dashboard.png)
 
 To enable live speech, add `FISH_AUDIO_API_KEY` to `.env`. To enable open-ended model responses, also add either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Secret values stay server-side and `.env` is gitignored.
@@ -108,7 +114,7 @@ CI runs `npm ci`, type checking, all tests, and the production build on every pu
 
 ## Deploy on Railway
 
-The repository includes [`railway.json`](railway.json) and a multi-stage [`Dockerfile`](Dockerfile). Railway uses the Docker image, waits for `/api/health/live`, and restarts the service after process failures.
+The repository includes [`railway.json`](railway.json) and a multi-stage [`Dockerfile`](Dockerfile). Railway uses the Docker image, waits for `/api/health/ready`, and restarts the service after process failures.
 
 1. Create a Railway service from this GitHub repository.
 2. Add provider and security values from `.env.example` in Railway Variables; do not upload the local `.env` file.
@@ -116,7 +122,7 @@ The repository includes [`railway.json`](railway.json) and a multi-stage [`Docke
 4. For call records that survive deployments, attach a Railway volume at `/app/data` and set `DATA_DIR=/app/data`.
 5. Run a prepared appointment scenario and verify `/api/status` before sharing the URL.
 
-For a paid customer deployment, set `CUSTOMER_MODE=true` and complete every customer/product variable in `.env.example`. Readiness then fails closed if branding, privacy contact, encryption, admin access, provider intelligence, allowed origins, or a positive monthly usage limit is missing.
+For a paid customer deployment, set `CUSTOMER_MODE=true`, `WEB_REPLICA_COUNT=1`, and complete every customer/product variable in `.env.example`. Production startup and readiness fail closed if branding, privacy contact, 32+ character encryption/admin credentials, provider intelligence, allowed origins, or a positive monthly usage limit is missing. Add a shared session store before increasing the replica count.
 
 Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
 

@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises
 import path from "node:path";
 import type { CallState, ConversationMessage } from "@shared/schema";
 import type { Locale } from "@shared/i18n";
+import { forwardCallIntegrations } from "./integrations";
 
 export type CallSource = "web" | "twilio";
 
@@ -76,73 +77,27 @@ async function ensureDataDirectory() {
   await mkdir(dataDirectory, { recursive: true, mode: 0o700 });
 }
 
-async function postWebhook(url: string, token: string | undefined, payload: unknown, eventId: string) {
-  if (!token?.trim()) throw new Error("Entegrasyon webhook token'ı yapılandırılmamış.");
-  if (process.env.NODE_ENV === "production" && new URL(url).protocol !== "https:") {
-    throw new Error("Production webhook adresi HTTPS olmalı.");
-  }
-  let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${token}`,
-          "idempotency-key": eventId,
-          "x-voiceops-event": "call.completed",
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(8_000),
-      });
-      if (response.ok) return;
-      lastError = new Error(`Entegrasyon webhook'u ${response.status} döndürdü.`);
-      if (response.status < 500 && response.status !== 429) break;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Entegrasyon webhook hatası.");
-    }
-  }
-  throw lastError || new Error("Entegrasyon webhook'u teslim edilemedi.");
-}
-
-async function forwardIntegrations(record: CallRecord) {
-  const tasks: Promise<void>[] = [];
-  if (process.env.CRM_WEBHOOK_URL) {
-    tasks.push(postWebhook(process.env.CRM_WEBHOOK_URL, process.env.CRM_WEBHOOK_TOKEN, record, record.id));
-  }
-  if (record.intent === "randevu" && process.env.CALENDAR_WEBHOOK_URL) {
-    tasks.push(postWebhook(
-      process.env.CALENDAR_WEBHOOK_URL,
-      process.env.CALENDAR_WEBHOOK_TOKEN,
-      {
-        ...record,
-        id: record.id,
-        callId: record.callId,
-        createdAt: record.createdAt,
-        locale: record.locale,
-        title: `${record.name || "Müşteri"} - Randevu talebi`,
-        name: record.name,
-        phone: record.phone,
-        requestedDate: record.requestedDate,
-        requestedTime: record.requestedTime,
-        summary: record.summary,
-      },
-      record.id,
-    ));
-  }
-  if (tasks.length === 0) return false;
-  await Promise.all(tasks);
-  return true;
-}
-
 export function recordsStatus() {
   return {
     enabled: process.env.RECORD_STORAGE !== "disabled",
     encrypted: Boolean(encryptionKey()),
     crmWebhook: Boolean(process.env.CRM_WEBHOOK_URL),
     calendarWebhook: Boolean(process.env.CALENDAR_WEBHOOK_URL),
-    retentionDays: Number(process.env.RECORD_RETENTION_DAYS || 30),
+    retentionDays: configuredRetentionDays(),
   };
+}
+
+export function configuredRetentionDays() {
+  const configured = Number(process.env.RECORD_RETENTION_DAYS || 30);
+  return Number.isInteger(configured) && configured >= 1 && configured <= 3_650 ? configured : 30;
+}
+
+export function parseRecordLimit(value: unknown = 100) {
+  const normalized = Array.isArray(value) ? NaN : Number(value);
+  if (!Number.isInteger(normalized) || normalized < 1 || normalized > 500) {
+    throw Object.assign(new Error("Kayıt limiti 1 ile 500 arasında bir tam sayı olmalı."), { status: 400 });
+  }
+  return normalized;
 }
 
 export async function recordCompletedCall(input: {
@@ -173,15 +128,26 @@ export async function recordCompletedCall(input: {
   };
 
   recordedCallIds.add(input.callId);
-  writeQueue = writeQueue.then(async () => {
+  const saveTask = writeQueue.then(async () => {
+    const existing = await allRecords();
+    if (existing.some((item) => item.callId === input.callId)) return false;
     await ensureDataDirectory();
     await appendFile(recordsPath, `${encodeRecord(record)}\n`, { encoding: "utf8", mode: 0o600 });
+    return true;
   });
-  await writeQueue;
+  writeQueue = saveTask.then(() => undefined, () => undefined);
+  let saved = false;
+  try {
+    saved = await saveTask;
+  } catch (error) {
+    recordedCallIds.delete(input.callId);
+    throw error;
+  }
+  if (!saved) return { saved: false, forwarded: false };
 
   let forwarded = false;
   try {
-    forwarded = await forwardIntegrations(record);
+    forwarded = await forwardCallIntegrations(record);
   } catch (error) {
     console.error(JSON.stringify({
       level: "error",
@@ -193,7 +159,12 @@ export async function recordCompletedCall(input: {
   return { saved: true, forwarded, recordId: record.id };
 }
 
-export async function listCallRecords(limit = 100) {
+export function resetRecordIdempotencyForTests() {
+  recordedCallIds.clear();
+}
+
+export async function listCallRecords(limit: unknown = 100) {
+  const parsedLimit = parseRecordLimit(limit);
   await writeQueue;
   let content = "";
   try {
@@ -205,7 +176,7 @@ export async function listCallRecords(limit = 100) {
   return content
     .split("\n")
     .filter(Boolean)
-    .slice(-Math.max(1, Math.min(limit, 500)))
+    .slice(-parsedLimit)
     .map(decodeRecord)
     .reverse();
 }
@@ -229,7 +200,7 @@ async function allRecords() {
 }
 
 export async function pruneExpiredRecords() {
-  const retentionDays = Math.max(1, Number(process.env.RECORD_RETENTION_DAYS || 30));
+  const retentionDays = configuredRetentionDays();
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   const task = writeQueue.then(async () => {
     const records = await allRecords();

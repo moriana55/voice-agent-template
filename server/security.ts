@@ -48,24 +48,60 @@ export const turnLimiter = rateLimit({
   message: { message: "Görüşme isteği sınırı aşıldı. Kısa bir süre sonra tekrar deneyin." },
 });
 
+let activeTurns = 0;
+
+function maximumConcurrentTurns() {
+  const configured = Number(process.env.TURN_MAX_CONCURRENCY || 4);
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 4;
+}
+
+export function turnConcurrencyLimiter(_req: Request, res: Response, next: NextFunction) {
+  if (activeTurns >= maximumConcurrentTurns()) {
+    res.setHeader("Retry-After", "2");
+    return res.status(429).json({ message: "Sistem görüşme kapasitesi dolu. Lütfen kısa süre sonra tekrar deneyin." });
+  }
+  activeTurns += 1;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    activeTurns = Math.max(0, activeTurns - 1);
+  };
+  res.once("finish", release);
+  res.once("close", release);
+  try {
+    return next();
+  } catch (error) {
+    release();
+    throw error;
+  }
+}
+
 function configuredOrigins() {
-  return new Set(
-    (process.env.ALLOWED_ORIGINS || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
+  const origins = new Set<string>();
+  for (const value of (process.env.ALLOWED_ORIGINS || "").split(",").map((item) => item.trim()).filter(Boolean)) {
+    try {
+      origins.add(new URL(value).origin);
+    } catch {
+      // Invalid configured origins never grant access.
+    }
+  }
+  return origins;
 }
 
 export function sameOriginOnly(req: Request, res: Response, next: NextFunction) {
   const origin = req.get("origin");
   if (!origin) return next();
 
-  const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const trustProxy = process.env.TRUST_PROXY === "true";
+  const forwardedHost = trustProxy ? req.get("x-forwarded-host")?.split(",")[0]?.trim() : undefined;
+  const forwardedProto = trustProxy ? req.get("x-forwarded-proto")?.split(",")[0]?.trim() : undefined;
   const host = forwardedHost || req.get("host");
   const allowed = configuredOrigins();
   try {
-    if ((host && new URL(origin).host === host) || allowed.has(origin)) return next();
+    const parsedOrigin = new URL(origin).origin;
+    const requestOrigin = host ? new URL(`${forwardedProto || req.protocol}://${host}`).origin : null;
+    if ((requestOrigin && parsedOrigin === requestOrigin) || allowed.has(parsedOrigin)) return next();
   } catch {
     // Invalid origins are rejected below.
   }
@@ -80,6 +116,8 @@ function safeSecretMatch(candidate: string, expected: string) {
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
   const expected = process.env.ADMIN_API_KEY;
   if (!expected) {
     return res.status(503).json({ message: "Yönetim API'si yapılandırılmamış." });

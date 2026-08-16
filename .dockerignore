@@ -12,3 +12,15 @@ coverage
 .DS_Store
 docs/assets/*.psd
 docs/assets/*.sketch
+docs/assets
+docs/demo
+projects
+Türkçe Demo
+rapor.html
+report-en.html
+script/audition-turkish-voices.mjs
+script/build-linkedin-demo.sh
+script/build-multilingual-demo.mjs
+script/build-turkish-demo.mjs
+script/generate-multilingual-demo-audio.mjs
+script/generate-turkish-demo-audio.mjs

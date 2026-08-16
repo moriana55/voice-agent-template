@@ -29,6 +29,27 @@ export const turnRequestSchema = z.object({
   state: callStateSchema.optional(),
 });
 
+export const outboundCallRequestSchema = z.object({
+  to: z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Telefon numarası E.164 biçiminde olmalı."),
+  locale: localeSchema.default("en"),
+});
+
+export const checkoutSessionRequestSchema = z.object({
+  email: z.email("Geçerli bir e-posta adresi girin."),
+});
+
+export const integrationIdSchema = z.enum([
+  "twilio",
+  "googleCalendar",
+  "hubspot",
+  "stripe",
+  "genericCrmWebhook",
+  "genericCalendarWebhook",
+]);
+
 export type ConversationMessage = z.infer<typeof messageSchema>;
 export type CallState = z.infer<typeof callStateSchema>;
 export type TurnRequest = z.infer<typeof turnRequestSchema>;
+export type OutboundCallRequest = z.infer<typeof outboundCallRequestSchema>;
+export type CheckoutSessionRequest = z.infer<typeof checkoutSessionRequestSchema>;
+export type IntegrationId = z.infer<typeof integrationIdSchema>;
