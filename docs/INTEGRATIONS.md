@@ -1,6 +1,6 @@
 # VoiceOps Studio integrations
 
-All provider credentials are server-side environment variables. The protected `/#/admin` view only returns readiness and missing variable names; it never returns secret values.
+All provider credentials are server-side environment variables. The protected `/#/admin` view only returns readiness and missing variable names; it never returns secret values. Use the [`CUSTOMER_ONBOARDING.md`](CUSTOMER_ONBOARDING.md) launch gate to decide which integrations are actually authorized for a customer.
 
 ## Twilio Voice
 
