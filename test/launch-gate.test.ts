@@ -7,6 +7,7 @@ import {
 } from "../script/launch-gate.mjs";
 
 const revision = "a".repeat(40);
+const railwayDeploymentId = "ece2ef4c-fd63-4d79-b23e-a7948eca568d";
 
 function evidenceItem(status: "approved" | "passed") {
   return {
@@ -20,12 +21,13 @@ function evidenceItem(status: "approved" | "passed") {
 function validEvidence() {
   return validateLaunchEvidence({
     format: "voiceops-launch-evidence",
-    version: 1,
+    version: 2,
     environment: {
       kind: "customer",
       name: "customer-production",
       origin: "https://customer.example.com",
       deployedRevision: revision,
+      railwayDeploymentId,
     },
     approvals: {
       businessIdentity: evidenceItem("approved"),
@@ -72,6 +74,7 @@ function passingRuntime() {
       payload: {
         ready: true,
         revision,
+        railwayDeploymentId,
         mode: "live",
         commercial: { enabled: true, ready: true, issues: [] },
         deploymentIssues: [],
@@ -108,15 +111,24 @@ test("launch gate public demo ortamını müşteri ortamı saymaz", () => {
   assert.ok(result.checks.some((item: { id: string; passed: boolean }) => item.id === "live-provider-mode" && !item.passed));
 });
 
+test("launch gate onaylanandan farklı Railway deployment'ını reddeder", () => {
+  const runtime = passingRuntime();
+  runtime.operational.payload.railwayDeploymentId = "7aae0e55-97f2-4fc8-921e-8f22aed7952b";
+  const result = evaluateRuntime(runtime, validEvidence(), railwayBackup);
+  assert.equal(result.passed, false);
+  assert.ok(result.checks.some((item: { id: string; passed: boolean }) => item.id === "railway-deployment" && !item.passed));
+});
+
 test("launch evidence pending veya eksik onayı reddeder", () => {
   const evidence = {
     format: "voiceops-launch-evidence",
-    version: 1,
+    version: 2,
     environment: {
       kind: "customer",
       name: "customer-production",
       origin: "https://customer.example.com",
       deployedRevision: revision,
+      railwayDeploymentId,
     },
     approvals: { businessIdentity: { ...evidenceItem("approved"), status: "pending" } },
     technicalChecks: {},

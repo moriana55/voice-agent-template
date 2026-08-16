@@ -70,7 +70,7 @@ function evidenceItem(value, label, expectedStatus) {
 
 export function validateLaunchEvidence(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail("Launch evidence must be an object.");
-  if (value.format !== "voiceops-launch-evidence" || value.version !== 1) fail("Launch evidence format is invalid.");
+  if (value.format !== "voiceops-launch-evidence" || value.version !== 2) fail("Launch evidence format is invalid.");
   if (!value.environment || typeof value.environment !== "object" || Array.isArray(value.environment)) {
     fail("Launch evidence environment is missing.");
   }
@@ -79,6 +79,14 @@ export function validateLaunchEvidence(value) {
   const origin = safeBaseUrl(requiredText(value.environment.origin, "environment.origin", 2_048));
   const deployedRevision = requiredText(value.environment.deployedRevision, "environment.deployedRevision", 40).toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(deployedRevision)) fail("environment.deployedRevision must be a 40-character git SHA.");
+  const railwayDeploymentId = requiredText(
+    value.environment.railwayDeploymentId,
+    "environment.railwayDeploymentId",
+    36,
+  ).toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(railwayDeploymentId)) {
+    fail("environment.railwayDeploymentId must be a UUID.");
+  }
 
   const approvals = {};
   for (const id of approvalIds) approvals[id] = evidenceItem(value.approvals?.[id], `approvals.${id}`, "approved");
@@ -94,7 +102,7 @@ export function validateLaunchEvidence(value) {
   return {
     format: value.format,
     version: value.version,
-    environment: { kind: "customer", name, origin, deployedRevision },
+    environment: { kind: "customer", name, origin, deployedRevision, railwayDeploymentId },
     approvals,
     technicalChecks,
     requiredIntegrations,
@@ -145,6 +153,8 @@ export function evaluateRuntime(runtime, evidence, backup) {
   addCheck(checks, "deployment-safety", operational.payload?.deploymentIssues?.length === 0, "Deployment safety has no open issues");
   addCheck(checks, "revision", operational.payload?.revision === evidence.environment.deployedRevision,
     "Runtime revision matches approved evidence");
+  addCheck(checks, "railway-deployment", operational.payload?.railwayDeploymentId === evidence.environment.railwayDeploymentId,
+    "Runtime Railway deployment matches approved evidence");
   addCheck(checks, "live-provider-mode", status.payload?.mode === "live" && operational.payload?.mode === "live",
     "LLM and voice providers are live without fallback");
   addCheck(checks, "brain-provider", status.payload?.services?.anthropic === true || status.payload?.services?.openai === true,
@@ -269,11 +279,12 @@ async function main() {
   const evaluation = evaluateRuntime({ live, ready, status, product, operational, integrations }, evidence, backup);
   const report = {
     format: "voiceops-launch-gate-report",
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     targetOrigin: baseUrl,
     environment: evidence.environment.name,
     revision: evidence.environment.deployedRevision,
+    railwayDeploymentId: evidence.environment.railwayDeploymentId,
     evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
     backup,
     ...evaluation,

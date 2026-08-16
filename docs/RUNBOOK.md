@@ -50,7 +50,7 @@ The mode reflects runtime provider results after a request, not only whether a k
 11. Run `LOAD_BASE_URL=<isolated-demo-url> npm run smoke:load`; never set `LOAD_ALLOW_LIVE=true` without an explicit provider-cost budget.
 12. Confirm log ingestion and alert delivery in the target platform.
 13. Record the deployed git revision and the previous known-good artifact.
-14. Set `APP_REVISION` to that exact 40-character commit SHA and run the executable gate documented in [`CUSTOMER_ONBOARDING.md`](CUSTOMER_ONBOARDING.md). Do not route customer traffic unless its report has `passed: true`.
+14. Set `APP_REVISION` to that exact 40-character commit SHA, record the release's Railway deployment UUID in the launch evidence, and run the executable gate documented in [`CUSTOMER_ONBOARDING.md`](CUSTOMER_ONBOARDING.md). Do not route customer traffic unless its report has `passed: true` and both identifiers match the authenticated runtime response.
 
 ## Common incidents
 
