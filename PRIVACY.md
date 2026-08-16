@@ -10,9 +10,13 @@ işletmeye özel KVKK/GDPR metni ve hukuki dayanak ayrıca doğrulanmalıdır.
 - Kullanıcı paylaşırsa isim, telefon ve randevu tercihi
 - Teknik istek bilgisi: zaman, endpoint, durum kodu, süre ve rastgele istek kimliği
 
-Ham ses kalıcı olarak saklanmaz. Yalnızca kullanıcı ayrı kayıt iznini seçerse
-tamamlanan talebin yapılandırılmış özeti ve son görüşme mesajları `DATA_DIR`
-altındaki çağrı kayıtlarına yazılır.
+Ham ses kalıcı olarak saklanmaz. Görüşmenin restart sonrasında devam edebilmesi
+için aktif görüşmenin son başarılı durumu, `WEB_SESSION_STORAGE=encrypted-file`
+iken `DATA_DIR` altında şifreli biçimde en fazla `WEB_SESSION_TTL_MINUTES`
+(varsayılan 120 dakika) tutulur. Bu geçici operasyon durumu, ayrıca izin verilen
+tamamlanmış müşteri kaydından ayrıdır. Yalnızca kullanıcı ayrı kayıt iznini
+seçerse tamamlanan talebin yapılandırılmış özeti ve son görüşme mesajları çağrı
+kayıtlarına daha uzun süreli olarak yazılır.
 
 ## Koruma
 
@@ -21,6 +25,8 @@ altındaki çağrı kayıtlarına yazılır.
 - API loglarına döküm, isim, telefon veya ses içeriği yazılmaz.
 - Yönetim kayıtları yalnızca `ADMIN_API_KEY` ile okunabilir veya silinebilir.
 - Varsayılan saklama süresi 30 gündür; `RECORD_RETENTION_DAYS` ile değiştirilebilir.
+- Geçici restart oturumları startup sırasında ve periyodik olarak TTL'ye göre
+  temizlenir; bozuk veya yanlış anahtarlı oturum deposu sessizce sıfırlanmaz.
 - Tarayıcı, veri işleme bilgilendirmesi kabul edilmeden görüşme isteği göndermez;
   sunucu da `noticeAcknowledged=true` olmayan web isteklerini reddeder.
 - Kayıt/aktarım izni `storageConsent` ile bilgilendirme kabulünden ayrı tutulur.

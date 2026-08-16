@@ -76,6 +76,7 @@ export function commercialReadiness() {
   if (process.env.WEB_SESSION_STORAGE !== "encrypted-file") {
     issues.push("WEB_SESSION_STORAGE=encrypted-file");
   }
+  if (!process.env.WEB_SESSION_TTL_MINUTES?.trim()) issues.push("WEB_SESSION_TTL_MINUTES");
   if (nonNegativeNumber("USAGE_HARD_LIMIT_MINUTES", 0) <= 0) issues.push("USAGE_HARD_LIMIT_MINUTES");
   if (!process.env.FISH_AUDIO_API_KEY?.trim()) issues.push("FISH_AUDIO_API_KEY");
   if (!process.env.ANTHROPIC_API_KEY?.trim() && !process.env.OPENAI_API_KEY?.trim()) {
@@ -172,6 +173,8 @@ export function deploymentSafetyIssues() {
     ["TURN_RATE_LIMIT", 1, 10_000],
     ["TURN_MAX_CONCURRENCY", 1, 1_000],
     ["WEB_SESSION_LIMIT", 1, 1_000_000],
+    ["WEB_SESSION_TTL_MINUTES", 5, 1_440],
+    ["WEB_SESSION_PRUNE_INTERVAL_MS", 60_000, 3_600_000],
     ["APPOINTMENT_DURATION_MINUTES", 5, 240],
     ["GRACEFUL_SHUTDOWN_MS", 1_000, 30_000],
     ["PORT", 1, 65_535],
