@@ -17,6 +17,7 @@ test("müşteri modunda eksik ticari sırları ve sınırları hazır saymaz", (
   process.env.ADMIN_API_KEY = "admin-test-key";
   process.env.RECORD_STORAGE = "enabled";
   process.env.DATA_ENCRYPTION_KEY = "records-test-key";
+  process.env.WEB_SESSION_STORAGE = "encrypted-file";
   process.env.USAGE_HARD_LIMIT_MINUTES = "500";
   process.env.FISH_AUDIO_API_KEY = "fish-test-key";
   process.env.ANTHROPIC_API_KEY = "brain-test-key";
@@ -58,7 +59,7 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     "CALENDAR_WEBHOOK_URL", "CALENDAR_WEBHOOK_TOKEN",
     "INTEGRATION_WEBHOOK_ALLOWED_HOSTS", "PUBLIC_BASE_URL", "PUBLIC_PRIVACY_URL",
     "RECORD_RETENTION_DAYS", "RECORD_PRUNE_INTERVAL_MS", "TURN_RATE_LIMIT",
-    "TURN_MAX_CONCURRENCY", "WEB_SESSION_LIMIT", "APPOINTMENT_DURATION_MINUTES",
+    "TURN_MAX_CONCURRENCY", "WEB_SESSION_LIMIT", "WEB_SESSION_STORAGE", "APPOINTMENT_DURATION_MINUTES",
     "BUSINESS_TIME_ZONE", "GRACEFUL_SHUTDOWN_MS", "PORT",
   ] as const;
   const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));

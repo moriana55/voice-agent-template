@@ -17,7 +17,7 @@ The production SLO, monitor, incident-routing, and privacy contract is documente
 - Protected outbound call: `POST /api/admin/telephony/outbound`
 - Protected subscription Checkout: `POST /api/admin/billing/checkout`
 - Stripe webhook: `POST /api/integrations/stripe/webhook`
-- Persistent data: `DATA_DIR/call-records.jsonl` when `RECORD_STORAGE` is enabled
+- Persistent data: `DATA_DIR/call-records.jsonl`, `DATA_DIR/usage-events.jsonl`, and encrypted `DATA_DIR/web-sessions.enc.json` when their respective storage modes are enabled
 - Railway volume mount: `/app/data` with `DATA_DIR=/app/data`
 - Container startup normalizes ownership only on `/app/data`, then drops to the unprivileged `node` user before starting the service.
 - Production readiness responses expose only the boolean `ready`; inspect structured logs and the authenticated operations view for diagnostics.
@@ -41,12 +41,13 @@ The mode reflects runtime provider results after a request, not only whether a k
 4. Set `PUBLIC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` before enabling telephone traffic.
 5. Set `USAGE_HARD_LIMIT_MINUTES` to a positive contractual ceiling and tune `TURN_MAX_CONCURRENCY`. Production startup rejects live provider credentials without a positive ceiling and `ALLOWED_ORIGINS`.
 6. Put every generic CRM/calendar webhook hostname in `INTEGRATION_WEBHOOK_ALLOWED_HOSTS`; production rejects HTTP, private/loopback literals, redirects, missing tokens, and non-allowlisted hosts.
-7. Keep `WEB_REPLICA_COUNT=1` while web sessions use process memory. A shared session store is required before horizontal scaling.
+7. For customer traffic set `WEB_SESSION_STORAGE=encrypted-file`; startup decrypts and validates the store before accepting traffic. Keep `WEB_REPLICA_COUNT=1`: the attached volume survives restarts but is not a multi-replica shared session store.
 8. Keep `TELEPHONY_RECORD_STORAGE=disabled` until the customer's recording basis and notice are approved.
-9. Verify liveness, readiness, one acknowledged browser turn, one separately consented saved record, one rejected non-acknowledged turn, one usage report, one signed Twilio request, and every configured integration shown as ready in the operations view.
+9. Verify liveness, readiness, one acknowledged browser turn, one restart-resumed browser turn, one separately consented saved record, one rejected non-acknowledged turn, one usage report, one signed Twilio request, and every configured integration shown as ready in the operations view.
 10. Send a staged `SIGTERM` and confirm `shutdown_started` followed by a non-forced `shutdown_completed` event.
-11. Confirm log ingestion and alert delivery in the target platform.
-12. Record the deployed git revision and the previous known-good artifact.
+11. Run `LOAD_BASE_URL=<isolated-demo-url> npm run smoke:load`; never set `LOAD_ALLOW_LIVE=true` without an explicit provider-cost budget.
+12. Confirm log ingestion and alert delivery in the target platform.
+13. Record the deployed git revision and the previous known-good artifact.
 
 ## Common incidents
 
@@ -84,8 +85,8 @@ Symptoms: no streamed audio, `fishAudio` becomes false, or the browser uses loca
 
 ## Rollback
 
-Deploy the previously recorded, tested artifact using the hosting platform’s normal rollback mechanism. Re-run liveness and the prepared smoke flow after rollback. Database migrations are not currently used, but encrypted call records require the same `DATA_ENCRYPTION_KEY` to remain readable.
+Deploy the previously recorded, tested artifact using the hosting platform’s normal rollback mechanism. Re-run liveness and the prepared smoke flow after rollback. Database migrations are not currently used, but encrypted call records and durable web sessions require the same `DATA_ENCRYPTION_KEY` to remain readable.
 
 ## Backup and restore boundary
 
-The repository implements local encrypted JSONL storage and retention pruning; it does not implement infrastructure backups. A production owner must configure volume snapshots, retention, access control, and a restore drill. Restores must use the matching encryption key and should be verified in an isolated environment before serving traffic.
+The repository implements encrypted application storage, atomic session-file replacement, and retention pruning; it does not create infrastructure snapshots. Railway's Backups screen currently reports that backups/PITR require the Pro plan for this Hobby workspace. Before customer mode is enabled, either upgrade and configure daily plus weekly volume backups or approve a separately secured off-platform export target. A restore drill must create an isolated replacement volume, retain the original, use the matching encryption key, and pass readiness, record decryption, and restart-resume checks before traffic is switched.

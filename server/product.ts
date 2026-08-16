@@ -73,6 +73,9 @@ export function commercialReadiness() {
   if (process.env.RECORD_STORAGE !== "disabled" && !process.env.DATA_ENCRYPTION_KEY?.trim()) {
     issues.push("DATA_ENCRYPTION_KEY");
   }
+  if (process.env.WEB_SESSION_STORAGE !== "encrypted-file") {
+    issues.push("WEB_SESSION_STORAGE=encrypted-file");
+  }
   if (nonNegativeNumber("USAGE_HARD_LIMIT_MINUTES", 0) <= 0) issues.push("USAGE_HARD_LIMIT_MINUTES");
   if (!process.env.FISH_AUDIO_API_KEY?.trim()) issues.push("FISH_AUDIO_API_KEY");
   if (!process.env.ANTHROPIC_API_KEY?.trim() && !process.env.OPENAI_API_KEY?.trim()) {
@@ -113,6 +116,12 @@ export function deploymentSafetyIssues() {
   );
   if (process.env.RECORD_STORAGE !== "disabled" && !process.env.DATA_ENCRYPTION_KEY?.trim()) {
     issues.add("DATA_ENCRYPTION_KEY|RECORD_STORAGE=disabled");
+  }
+  if (!["memory", "encrypted-file"].includes(process.env.WEB_SESSION_STORAGE || "memory")) {
+    issues.add("WEB_SESSION_STORAGE(memory|encrypted-file)");
+  }
+  if (process.env.WEB_SESSION_STORAGE === "encrypted-file" && !process.env.DATA_ENCRYPTION_KEY?.trim()) {
+    issues.add("DATA_ENCRYPTION_KEY|WEB_SESSION_STORAGE=memory");
   }
   if (process.env.DATA_ENCRYPTION_KEY?.trim() && process.env.DATA_ENCRYPTION_KEY.trim().length < 32) {
     issues.add("DATA_ENCRYPTION_KEY(min 32 chars)");
