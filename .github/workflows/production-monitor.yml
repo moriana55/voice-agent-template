@@ -1,0 +1,119 @@
+name: Production Monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Exercise incident creation without breaking production
+        required: false
+        type: boolean
+        default: false
+      run_voice_synthetic:
+        description: Run the quota-consuming Fish Audio synthetic check
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+
+env:
+  SMOKE_BASE_URL: https://voiceops-studio-production.up.railway.app
+
+jobs:
+  health:
+    name: Production health
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Probe liveness and readiness
+        env:
+          SIMULATE_FAILURE: ${{ inputs.simulate_failure || 'false' }}
+        run: |
+          node --input-type=module <<'NODE'
+          const baseUrl = process.env.SMOKE_BASE_URL;
+          const probe = async (path, expectedField) => {
+            const response = await fetch(`${baseUrl}${path}`, {
+              cache: "no-store",
+              signal: AbortSignal.timeout(15_000),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload[expectedField] !== true) {
+              throw new Error(`${path} failed with HTTP ${response.status}`);
+            }
+            return response.status;
+          };
+          const live = await probe("/api/health/live", "ok");
+          const ready = await probe("/api/health/ready", "ready");
+          if (process.env.SIMULATE_FAILURE === "true") {
+            throw new Error("Simulated production monitor failure");
+          }
+          console.log(JSON.stringify({ ok: true, live, ready }));
+          NODE
+
+      - name: Open deduplicated incident issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Production health check failed"
+          existing="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --search "${title} in:title" --json number --jq '.[0].number // empty')"
+          if test -z "${existing}"; then
+            gh issue create --repo "${GITHUB_REPOSITORY}" --title "${title}" --assignee "${GITHUB_REPOSITORY_OWNER}" --body "The automated production liveness/readiness probe failed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Follow docs/RUNBOOK.md and do not post secrets or customer payloads in this issue."
+          fi
+
+      - name: Close recovered health incident
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Production health check failed"
+          issue="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --search "${title} in:title" --json number --jq '.[0].number // empty')"
+          if test -n "${issue}"; then
+            gh issue close "${issue}" --repo "${GITHUB_REPOSITORY}" --comment "Production liveness and readiness recovered in run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
+          fi
+
+  voice-synthetic:
+    name: Daily voice synthetic
+    if: github.event.schedule == '17 5 * * *' || inputs.run_voice_synthetic == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Verify real Fish Audio streaming
+        run: node script/live-smoke.mjs
+
+      - name: Open deduplicated voice incident issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Production voice synthetic failed"
+          existing="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --search "${title} in:title" --json number --jq '.[0].number // empty')"
+          if test -z "${existing}"; then
+            gh issue create --repo "${GITHUB_REPOSITORY}" --title "${title}" --assignee "${GITHUB_REPOSITORY_OWNER}" --body "The daily Fish Audio streaming synthetic failed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Check provider status, quota, Railway logs, and docs/RUNBOOK.md. Do not post secrets or customer payloads."
+          fi
+
+      - name: Close recovered voice incident
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Production voice synthetic failed"
+          issue="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --search "${title} in:title" --json number --jq '.[0].number // empty')"
+          if test -n "${issue}"; then
+            gh issue close "${issue}" --repo "${GITHUB_REPOSITORY}" --comment "The production voice synthetic recovered in run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
+          fi
