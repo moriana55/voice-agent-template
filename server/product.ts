@@ -92,6 +92,14 @@ export function commercialReadiness() {
   if (process.env.TELEPHONY_RECORD_STORAGE === "enabled" && !process.env.TWILIO_AUTH_TOKEN?.trim()) {
     issues.push("TWILIO_AUTH_TOKEN");
   }
+  const telephonyConfigured = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]
+    .some((name) => process.env[name]?.trim());
+  if (telephonyConfigured && process.env.TELEPHONY_SESSION_STORAGE !== "encrypted-file") {
+    issues.push("TELEPHONY_SESSION_STORAGE=encrypted-file");
+  }
+  if (telephonyConfigured && !process.env.TELEPHONY_SESSION_TTL_MINUTES?.trim()) {
+    issues.push("TELEPHONY_SESSION_TTL_MINUTES");
+  }
 
   const integrationGroups = [
     { trigger: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"], required: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "PUBLIC_BASE_URL"] },
@@ -123,6 +131,20 @@ export function deploymentSafetyIssues() {
   }
   if (process.env.WEB_SESSION_STORAGE === "encrypted-file" && !process.env.DATA_ENCRYPTION_KEY?.trim()) {
     issues.add("DATA_ENCRYPTION_KEY|WEB_SESSION_STORAGE=memory");
+  }
+  if (!["memory", "encrypted-file"].includes(process.env.TELEPHONY_SESSION_STORAGE || "memory")) {
+    issues.add("TELEPHONY_SESSION_STORAGE(memory|encrypted-file)");
+  }
+  if (process.env.TELEPHONY_SESSION_STORAGE === "encrypted-file" && !process.env.DATA_ENCRYPTION_KEY?.trim()) {
+    issues.add("DATA_ENCRYPTION_KEY|TELEPHONY_SESSION_STORAGE=memory");
+  }
+  const telephonyConfigured = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]
+    .some((name) => process.env[name]?.trim());
+  if (telephonyConfigured && process.env.TELEPHONY_SESSION_STORAGE !== "encrypted-file") {
+    issues.add("TELEPHONY_SESSION_STORAGE=encrypted-file");
+  }
+  if (telephonyConfigured && !process.env.TELEPHONY_SESSION_TTL_MINUTES?.trim()) {
+    issues.add("TELEPHONY_SESSION_TTL_MINUTES");
   }
   if (process.env.DATA_ENCRYPTION_KEY?.trim() && process.env.DATA_ENCRYPTION_KEY.trim().length < 32) {
     issues.add("DATA_ENCRYPTION_KEY(min 32 chars)");
@@ -175,6 +197,9 @@ export function deploymentSafetyIssues() {
     ["WEB_SESSION_LIMIT", 1, 1_000_000],
     ["WEB_SESSION_TTL_MINUTES", 5, 1_440],
     ["WEB_SESSION_PRUNE_INTERVAL_MS", 60_000, 3_600_000],
+    ["TELEPHONY_SESSION_LIMIT", 1, 100_000],
+    ["TELEPHONY_SESSION_TTL_MINUTES", 5, 1_440],
+    ["TELEPHONY_SESSION_PRUNE_INTERVAL_MS", 60_000, 3_600_000],
     ["APPOINTMENT_DURATION_MINUTES", 5, 240],
     ["GRACEFUL_SHUTDOWN_MS", 1_000, 30_000],
     ["PORT", 1, 65_535],

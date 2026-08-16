@@ -24,7 +24,7 @@ Never paste provider secrets, customer records, transcripts, or phone numbers in
 Enable only the channels included in the signed customer scope:
 
 - Browser voice/text requires acknowledged processing notice. Durable restart state is encrypted and TTL-bounded; it is not a completed customer record.
-- Twilio requires an owned number, signed-webhook verification, an approved telephone disclosure, and a non-customer inbound/outbound test. Keep `TELEPHONY_RECORD_STORAGE=disabled` unless the customer's legal basis explicitly covers it.
+- Twilio requires an owned number, signed-webhook verification, encrypted TTL-bounded active-call sessions, an approved telephone disclosure, and a non-customer inbound/outbound test. Keep `TELEPHONY_RECORD_STORAGE=disabled` unless the customer's legal basis explicitly covers it.
 - Google Calendar requires the target calendar, time zone, duration, and OAuth account owner.
 - HubSpot requires a private app with only contact read/write permissions and an approved phone-based deduplication rule.
 - Generic CRM/calendar webhooks require an exact hostname allowlist, a 32+ character token, idempotency support, and an owner for delivery failures.

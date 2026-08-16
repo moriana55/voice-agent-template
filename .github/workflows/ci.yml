@@ -43,6 +43,8 @@ jobs:
           WEB_SESSION_STORAGE: encrypted-file
           TURN_RATE_LIMIT: "200"
           TWILIO_AUTH_TOKEN: smoke-twilio
+          TELEPHONY_SESSION_STORAGE: encrypted-file
+          TELEPHONY_SESSION_TTL_MINUTES: "120"
           TELEPHONY_RECORD_STORAGE: enabled
           PUBLIC_BASE_URL: ""
           ALLOWED_ORIGINS: http://127.0.0.1:5193

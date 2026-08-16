@@ -30,6 +30,7 @@ import {
 import { requireAdmin, turnConcurrencyLimiter, turnLimiter } from "./security";
 import { synthesizeFishBuffer } from "./fish";
 import { registerTelephonyRoutes } from "./telephony";
+import { telephonySessionStatus } from "./telephony-sessions";
 import {
   commercialReadiness,
   deploymentSafetyIssues,
@@ -460,7 +461,7 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   await initializeWebSessions();
-  registerTelephonyRoutes(app);
+  await registerTelephonyRoutes(app);
   await pruneExpiredRecords();
   const configuredPruneInterval = Number(process.env.RECORD_PRUNE_INTERVAL_MS || 6 * 60 * 60 * 1000);
   const pruneIntervalMs = Number.isFinite(configuredPruneInterval)
@@ -616,6 +617,7 @@ export async function registerRoutes(
       },
       records: recordsStatus(),
       sessions: webSessionStatus(),
+      telephonySessions: telephonySessionStatus(),
       product: publicProductConfig(),
       localization: {
         defaultLocale: DEFAULT_LOCALE,

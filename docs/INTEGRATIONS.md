@@ -11,6 +11,8 @@ PUBLIC_BASE_URL=https://your-public-domain.example
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_PHONE_NUMBER=+15551234567
+TELEPHONY_SESSION_STORAGE=encrypted-file
+TELEPHONY_SESSION_TTL_MINUTES=120
 ```
 
 Configure the number's incoming voice webhook as:
@@ -19,7 +21,7 @@ Configure the number's incoming voice webhook as:
 POST https://your-public-domain.example/api/telephony/incoming
 ```
 
-The operations view can initiate an outbound call to an E.164 number. Twilio requests the same incoming workflow URL and reports progress to `/api/telephony/status`. Every Twilio webhook is signature-verified. Each generated `<Gather>` URL carries a server nonce; signed retries reuse the cached TwiML response and completed nonce IDs remain protected by persistent usage idempotency.
+The operations view can initiate an outbound call to an E.164 number. Twilio requests the same incoming workflow URL and reports progress to `/api/telephony/status`. Every Twilio webhook is signature-verified. Each generated `<Gather>` URL carries a server nonce; signed retries reuse the cached TwiML response and completed nonce IDs remain protected by persistent usage idempotency. Active call state is encrypted on the mounted volume, restored after process restarts, protected against parallel turns, and pruned at the approved TTL. This temporary state is distinct from a completed call record.
 
 ## Google Calendar
 
