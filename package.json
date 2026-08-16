@@ -16,7 +16,8 @@
     "test": "node --import tsx --test test/**/*.test.ts",
     "smoke:http": "node script/http-smoke.mjs",
     "smoke:load": "node script/load-smoke.mjs",
-    "smoke:live": "node script/live-smoke.mjs"
+    "smoke:live": "node script/live-smoke.mjs",
+    "backup": "node script/encrypted-backup.mjs"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
