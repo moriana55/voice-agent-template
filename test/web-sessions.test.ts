@@ -9,6 +9,7 @@ import {
   beginWebTurn,
   commitWebTurn,
   initializeWebSessions,
+  pruneExpiredWebSessions,
   resetWebSessionsForTests,
   webSessionStatus,
 } from "../server/web-sessions";
@@ -108,6 +109,7 @@ test("şifreli dosya oturumu restart sonrasında son tamamlanan turdan sürdür�
       backend: "encrypted-file",
       durable: true,
       encrypted: true,
+      ttlMinutes: 120,
     });
 
     await resetWebSessionsForTests({ preserveStorage: true });
@@ -116,6 +118,13 @@ test("şifreli dosya oturumu restart sonrasında son tamamlanan turdan sürdür�
     assert.equal(resumed.history.length, 2);
     await abortWebTurn(resumed);
     await assert.rejects(beginWebTurn(callId, "en", turnId), /daha önce işlendi/i);
+
+    assert.equal(await pruneExpiredWebSessions(Date.now() + 121 * 60 * 1000), 1);
+    await resetWebSessionsForTests({ preserveStorage: true });
+    const afterExpiry = await beginWebTurn(callId, "en");
+    assert.equal(afterExpiry.state.intent, "genel");
+    assert.deepEqual(afterExpiry.history, []);
+    await abortWebTurn(afterExpiry);
   } finally {
     await resetWebSessionsForTests();
     if (previousStorage === undefined) delete process.env.WEB_SESSION_STORAGE;

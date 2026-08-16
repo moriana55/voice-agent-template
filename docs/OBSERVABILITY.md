@@ -21,6 +21,7 @@ This document defines the minimum operator evidence for VoiceOps Studio. Logs an
 | Integration delivery failure | `integration_delivery_failed` or `integration_webhook_failed` | Integration name and safe error category | Disable affected integration if necessary; retry only with the same idempotency key |
 | Capacity or abuse | HTTP 429 responses, quota and concurrency rejection | Usage report, bounded rate/concurrency settings | Verify legitimate traffic, adjust contractual limits only through a reviewed change |
 | Session store unreadable | Deployment fails with `startup_rejected` before listening | Encrypted session file and encryption-key version | Preserve the volume, restore the matching key or known-good backup; never replace the store silently |
+| Session retention failure | `web_session_prune_failed` structured event | Volume permissions, encryption key, session file integrity | Stop onboarding, preserve the volume, correct the cause, and verify TTL pruning before restoring traffic |
 
 ## Automated monitors
 

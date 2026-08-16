@@ -18,6 +18,7 @@ test("müşteri modunda eksik ticari sırları ve sınırları hazır saymaz", (
   process.env.RECORD_STORAGE = "enabled";
   process.env.DATA_ENCRYPTION_KEY = "records-test-key";
   process.env.WEB_SESSION_STORAGE = "encrypted-file";
+  process.env.WEB_SESSION_TTL_MINUTES = "120";
   process.env.USAGE_HARD_LIMIT_MINUTES = "500";
   process.env.FISH_AUDIO_API_KEY = "fish-test-key";
   process.env.ANTHROPIC_API_KEY = "brain-test-key";
@@ -59,7 +60,8 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     "CALENDAR_WEBHOOK_URL", "CALENDAR_WEBHOOK_TOKEN",
     "INTEGRATION_WEBHOOK_ALLOWED_HOSTS", "PUBLIC_BASE_URL", "PUBLIC_PRIVACY_URL",
     "RECORD_RETENTION_DAYS", "RECORD_PRUNE_INTERVAL_MS", "TURN_RATE_LIMIT",
-    "TURN_MAX_CONCURRENCY", "WEB_SESSION_LIMIT", "WEB_SESSION_STORAGE", "APPOINTMENT_DURATION_MINUTES",
+    "TURN_MAX_CONCURRENCY", "WEB_SESSION_LIMIT", "WEB_SESSION_STORAGE", "WEB_SESSION_TTL_MINUTES",
+    "WEB_SESSION_PRUNE_INTERVAL_MS", "APPOINTMENT_DURATION_MINUTES",
     "BUSINESS_TIME_ZONE", "GRACEFUL_SHUTDOWN_MS", "PORT",
   ] as const;
   const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
@@ -120,6 +122,8 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     process.env.RECORD_RETENTION_DAYS = "NaN";
     process.env.RECORD_PRUNE_INTERVAL_MS = "1000";
     process.env.TURN_MAX_CONCURRENCY = "0";
+    process.env.WEB_SESSION_TTL_MINUTES = "1";
+    process.env.WEB_SESSION_PRUNE_INTERVAL_MS = "10";
     process.env.APPOINTMENT_DURATION_MINUTES = "241";
     process.env.BUSINESS_TIME_ZONE = "Mars/Olympus_Mons";
     process.env.GRACEFUL_SHUTDOWN_MS = "999";
@@ -132,6 +136,8 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     assert.ok(malformedIssues.some((issue) => issue.startsWith("RECORD_RETENTION_DAYS(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("RECORD_PRUNE_INTERVAL_MS(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("TURN_MAX_CONCURRENCY(")));
+    assert.ok(malformedIssues.some((issue) => issue.startsWith("WEB_SESSION_TTL_MINUTES(")));
+    assert.ok(malformedIssues.some((issue) => issue.startsWith("WEB_SESSION_PRUNE_INTERVAL_MS(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("APPOINTMENT_DURATION_MINUTES(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("BUSINESS_TIME_ZONE(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("GRACEFUL_SHUTDOWN_MS(")));

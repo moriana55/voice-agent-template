@@ -57,6 +57,7 @@ import {
   beginWebTurn,
   commitWebTurn,
   initializeWebSessions,
+  pruneExpiredWebSessions,
   webSessionStatus,
   type WebTurnLease,
 } from "./web-sessions";
@@ -473,7 +474,22 @@ export async function registerRoutes(
     })));
   }, pruneIntervalMs);
   pruneTimer.unref();
-  httpServer.once("close", () => clearInterval(pruneTimer));
+  const configuredSessionPruneInterval = Number(process.env.WEB_SESSION_PRUNE_INTERVAL_MS || 15 * 60 * 1000);
+  const sessionPruneIntervalMs = Number.isFinite(configuredSessionPruneInterval)
+    ? Math.max(60_000, configuredSessionPruneInterval)
+    : 15 * 60 * 1000;
+  const sessionPruneTimer = setInterval(() => {
+    void pruneExpiredWebSessions().catch((error) => console.error(JSON.stringify({
+      level: "error",
+      event: "web_session_prune_failed",
+      message: error instanceof Error ? error.message : "Web session pruning failed",
+    })));
+  }, sessionPruneIntervalMs);
+  sessionPruneTimer.unref();
+  httpServer.once("close", () => {
+    clearInterval(pruneTimer);
+    clearInterval(sessionPruneTimer);
+  });
   app.get("/api/health/live", (_req, res) => {
     res.json({ ok: true, uptimeSeconds: Math.round(process.uptime()) });
   });

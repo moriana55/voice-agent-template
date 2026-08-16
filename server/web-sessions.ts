@@ -40,7 +40,6 @@ export type WebTurnLease = {
 };
 
 const sessions = new Map<string, WebSession>();
-const sessionTtlMs = 2 * 60 * 60 * 1000;
 let loadedStoragePath: string | null = null;
 let sessionQueue = Promise.resolve();
 
@@ -64,6 +63,11 @@ function encryptionKey() {
 function maximumSessions() {
   const configured = Number(process.env.WEB_SESSION_LIMIT || 5_000);
   return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 5_000;
+}
+
+export function configuredWebSessionTtlMinutes() {
+  const configured = Number(process.env.WEB_SESSION_TTL_MINUTES || 120);
+  return Number.isInteger(configured) && configured >= 5 && configured <= 1_440 ? configured : 120;
 }
 
 function validatedSession(value: PersistedWebSession): PersistedWebSession {
@@ -155,24 +159,24 @@ function runExclusive<T>(task: () => Promise<T>) {
 }
 
 function cleanSessions(now = Date.now()) {
-  let changed = false;
-  const cutoff = now - sessionTtlMs;
+  let deleted = 0;
+  const cutoff = now - configuredWebSessionTtlMinutes() * 60 * 1000;
   for (const [callId, session] of sessions) {
     if (!session.activeToken && session.updatedAt < cutoff) {
       sessions.delete(callId);
-      changed = true;
+      deleted += 1;
     }
   }
 
-  if (sessions.size < maximumSessions()) return changed;
+  if (sessions.size < maximumSessions()) return deleted;
   const evictable = [...sessions.entries()]
     .filter(([, session]) => !session.activeToken)
     .sort((left, right) => left[1].updatedAt - right[1].updatedAt);
   while (sessions.size >= maximumSessions() && evictable.length) {
     sessions.delete(evictable.shift()![0]);
-    changed = true;
+    deleted += 1;
   }
-  return changed;
+  return deleted;
 }
 
 function conflict(message: string) {
@@ -212,7 +216,7 @@ export async function beginWebTurn(
     const token = randomUUID();
     session.activeToken = token;
     session.updatedAt = Date.now();
-    if (cleaned) await persistSessions();
+    if (cleaned > 0) await persistSessions();
     return {
       callId: resolvedCallId,
       token,
@@ -275,11 +279,24 @@ export function webSessionStatus() {
     backend: storageEnabled() ? "encrypted-file" as const : "memory" as const,
     durable: storageEnabled(),
     encrypted: storageEnabled() && Boolean(process.env.DATA_ENCRYPTION_KEY?.trim()),
+    ttlMinutes: configuredWebSessionTtlMinutes(),
   };
 }
 
 export async function initializeWebSessions() {
-  await runExclusive(ensureLoaded);
+  await runExclusive(async () => {
+    await ensureLoaded();
+    if (cleanSessions() > 0) await persistSessions();
+  });
+}
+
+export async function pruneExpiredWebSessions(now = Date.now()) {
+  return runExclusive(async () => {
+    await ensureLoaded();
+    const deleted = cleanSessions(now);
+    if (deleted > 0) await persistSessions();
+    return deleted;
+  });
 }
 
 export async function resetWebSessionsForTests(options: { preserveStorage?: boolean } = {}) {

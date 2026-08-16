@@ -17,7 +17,7 @@ The production SLO, monitor, incident-routing, and privacy contract is documente
 - Protected outbound call: `POST /api/admin/telephony/outbound`
 - Protected subscription Checkout: `POST /api/admin/billing/checkout`
 - Stripe webhook: `POST /api/integrations/stripe/webhook`
-- Persistent data: `DATA_DIR/call-records.jsonl`, `DATA_DIR/usage-events.jsonl`, and encrypted `DATA_DIR/web-sessions.enc.json` when their respective storage modes are enabled
+- Persistent data: `DATA_DIR/call-records.jsonl`, `DATA_DIR/usage-events.jsonl`, and TTL-bounded encrypted `DATA_DIR/web-sessions.enc.json` when their respective storage modes are enabled
 - Railway volume mount: `/app/data` with `DATA_DIR=/app/data`
 - Container startup normalizes ownership only on `/app/data`, then drops to the unprivileged `node` user before starting the service.
 - Production readiness responses expose only the boolean `ready`; inspect structured logs and the authenticated operations view for diagnostics.
@@ -41,7 +41,7 @@ The mode reflects runtime provider results after a request, not only whether a k
 4. Set `PUBLIC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` before enabling telephone traffic.
 5. Set `USAGE_HARD_LIMIT_MINUTES` to a positive contractual ceiling and tune `TURN_MAX_CONCURRENCY`. Production startup rejects live provider credentials without a positive ceiling and `ALLOWED_ORIGINS`.
 6. Put every generic CRM/calendar webhook hostname in `INTEGRATION_WEBHOOK_ALLOWED_HOSTS`; production rejects HTTP, private/loopback literals, redirects, missing tokens, and non-allowlisted hosts.
-7. For customer traffic set `WEB_SESSION_STORAGE=encrypted-file`; startup decrypts and validates the store before accepting traffic. Keep `WEB_REPLICA_COUNT=1`: the attached volume survives restarts but is not a multi-replica shared session store.
+7. For customer traffic set `WEB_SESSION_STORAGE=encrypted-file` and explicitly approve `WEB_SESSION_TTL_MINUTES`; startup decrypts, validates, and prunes the store before accepting traffic. Keep `WEB_REPLICA_COUNT=1`: the attached volume survives restarts but is not a multi-replica shared session store.
 8. Keep `TELEPHONY_RECORD_STORAGE=disabled` until the customer's recording basis and notice are approved.
 9. Verify liveness, readiness, one acknowledged browser turn, one restart-resumed browser turn, one separately consented saved record, one rejected non-acknowledged turn, one usage report, one signed Twilio request, and every configured integration shown as ready in the operations view.
 10. Send a staged `SIGTERM` and confirm `shutdown_started` followed by a non-forced `shutdown_completed` event.
