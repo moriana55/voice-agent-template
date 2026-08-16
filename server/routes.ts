@@ -65,6 +65,12 @@ import {
 import { assertValidUploadedAudio, supportedAudioMimeTypes } from "./audio-validation";
 import { publicStreamErrorMessage } from "./error-safety";
 import { isServerDraining } from "./lifecycle";
+import {
+  preflightConfiguredBrainProviders,
+  providerAvailable,
+  setProviderHealth,
+  type ProviderName,
+} from "./provider-health";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -134,17 +140,6 @@ function isDemoBrain() {
     || (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY);
 }
 
-type ProviderName = "anthropic" | "openai" | "fishAudio";
-const providerHealth: Record<ProviderName, boolean | null> = {
-  anthropic: null,
-  openai: null,
-  fishAudio: null,
-};
-
-function providerAvailable(provider: ProviderName, configured: boolean) {
-  return configured && providerHealth[provider] !== false;
-}
-
 function currentMode(demo: boolean, fishConfigured: boolean) {
   const brainAvailable = !demo && (
     providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY))
@@ -168,7 +163,7 @@ const fallbackWarnings: Record<Locale, { brain: string; voice: string }> = {
 };
 
 function providerFailure(service: string, error: unknown, provider?: ProviderName) {
-  if (provider) providerHealth[provider] = false;
+  if (provider) setProviderHealth(provider, false);
   const detail = error instanceof Error ? error.message : String(error);
   console.warn(`[provider fallback] ${service}: ${detail}`);
 }
@@ -182,7 +177,7 @@ async function transcribeAudio(openai: OpenAI, file: Express.Multer.File, locale
     model: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe",
     language: transcriptionLanguage(locale),
   }, { signal: withTimeout(signal, 20_000) });
-  providerHealth.openai = true;
+  setProviderHealth("openai", true);
   return result.text.trim();
 }
 
@@ -202,10 +197,10 @@ async function transcribeFish(file: Express.Multer.File, locale: Locale, signal?
   });
   if (!response.ok) {
     const detail = await response.text();
-    providerHealth.fishAudio = false;
+    setProviderHealth("fishAudio", false);
     throw new Error(`Fish ASR ${response.status}: ${detail.slice(0, 240)}`);
   }
-  providerHealth.fishAudio = true;
+  setProviderHealth("fishAudio", true);
   const result = await response.json() as { text: string };
   return result.text.trim();
 }
@@ -222,10 +217,10 @@ function getFishCredit() {
         signal: AbortSignal.timeout(4_000),
       });
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) providerHealth.fishAudio = false;
+        if (response.status === 401 || response.status === 403) setProviderHealth("fishAudio", false);
         return;
       }
-      providerHealth.fishAudio = true;
+      setProviderHealth("fishAudio", true);
       const result = await response.json() as { credit: string };
       const value = Number(result.credit);
       if (Number.isFinite(value)) fishCreditCache = { value, expiresAt: Date.now() + 60_000 };
@@ -295,7 +290,7 @@ async function generateOpenAIReply(
     input: buildConversationPrompt(transcript, history, state, locale),
     store: false,
   }, { signal: withTimeout(signal, 20_000) });
-  providerHealth.openai = true;
+  setProviderHealth("openai", true);
   return response.output_text.trim();
 }
 
@@ -329,10 +324,10 @@ async function generateClaudeReply(
 
   if (!response.ok) {
     const detail = await response.text();
-    providerHealth.anthropic = false;
+    setProviderHealth("anthropic", false);
     throw new Error(`Claude API ${response.status}: ${detail.slice(0, 240)}`);
   }
-  providerHealth.anthropic = true;
+  setProviderHealth("anthropic", true);
 
   const result = await response.json() as {
     content?: Array<{ type: string; text?: string }>;
@@ -387,10 +382,10 @@ ${responseInstruction}`,
 
   if (!response.ok) {
     const detail = await response.text();
-    providerHealth.anthropic = false;
+    setProviderHealth("anthropic", false);
     throw new Error(`Claude API ${response.status}: ${detail.slice(0, 240)}`);
   }
-  providerHealth.anthropic = true;
+  setProviderHealth("anthropic", true);
   if (!response.body) throw new Error("Claude API akış gövdesi döndürmedi.");
 
   const reader = response.body.getReader();
@@ -448,10 +443,10 @@ function writeStreamEvent(res: Response, event: StreamEvent) {
 async function synthesizeFish(text: string, locale: Locale, signal?: AbortSignal) {
   try {
     const audio = await synthesizeFishBuffer(text, { signal, locale });
-    providerHealth.fishAudio = true;
+    setProviderHealth("fishAudio", true);
     return audio.toString("base64");
   } catch (error) {
-    providerHealth.fishAudio = false;
+    setProviderHealth("fishAudio", false);
     throw error;
   }
 }
@@ -460,6 +455,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
+  await preflightConfiguredBrainProviders();
   await initializeWebSessions();
   await registerTelephonyRoutes(app);
   await pruneExpiredRecords();
@@ -737,7 +733,7 @@ export async function registerRoutes(
                 settle();
               }, 8_000);
               connection.on(RealtimeEvents.AUDIO_CHUNK, (value: unknown) => {
-                providerHealth.fishAudio = true;
+                setProviderHealth("fishAudio", true);
                 const bytes = value instanceof Uint8Array ? value : Buffer.from(value as ArrayBuffer);
                 if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
                 writeStreamEvent(res, {
