@@ -6,4 +6,6 @@ dist/
 data/
 coverage/
 tmp/
+*.vopsbackup
+*.vopsbackup.manifest.json
 docs/demo/frames/

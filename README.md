@@ -144,7 +144,7 @@ Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
 - Docker multi-stage build that fixes the dedicated volume mount, then runs the application process as the non-root `node` user
 - Provider timeouts, cancellation propagation, and local fallback paths
 
-See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY.md`](SECURITY.md) for private vulnerability reporting, [`docs/CUSTOMER_ONBOARDING.md`](docs/CUSTOMER_ONBOARDING.md) for the paid-customer launch gate, and [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for runtime modes, incidents, and rollback boundaries.
+See [`PRIVACY.md`](PRIVACY.md) for the data-flow and retention notes, [`SECURITY.md`](SECURITY.md) for private vulnerability reporting, [`docs/CUSTOMER_ONBOARDING.md`](docs/CUSTOMER_ONBOARDING.md) for the paid-customer launch gate, [`docs/BACKUP_RESTORE.md`](docs/BACKUP_RESTORE.md) for encrypted recovery, and [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for runtime modes, incidents, and rollback boundaries.
 
 ## Current status and limits
 
