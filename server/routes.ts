@@ -52,7 +52,14 @@ import {
   integrationStatuses,
   processStripeWebhook,
 } from "./integrations";
-import { abortWebTurn, beginWebTurn, commitWebTurn, type WebTurnLease } from "./web-sessions";
+import {
+  abortWebTurn,
+  beginWebTurn,
+  commitWebTurn,
+  initializeWebSessions,
+  webSessionStatus,
+  type WebTurnLease,
+} from "./web-sessions";
 import { assertValidUploadedAudio, supportedAudioMimeTypes } from "./audio-validation";
 import { publicStreamErrorMessage } from "./error-safety";
 import { isServerDraining } from "./lifecycle";
@@ -451,6 +458,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
+  await initializeWebSessions();
   registerTelephonyRoutes(app);
   await pruneExpiredRecords();
   const configuredPruneInterval = Number(process.env.RECORD_PRUNE_INTERVAL_MS || 6 * 60 * 60 * 1000);
@@ -480,6 +488,7 @@ export async function registerRoutes(
       || process.env.NODE_ENV !== "production";
     const commercial = commercialReadiness();
     const deploymentIssues = deploymentSafetyIssues();
+    const sessionConfiguration = webSessionStatus();
     const ready = !isServerDraining()
       && fishAudio && brain && privacyReady && commercial.ready && deploymentIssues.length === 0;
     res.status(ready ? 200 : 503).json(publicReadinessPayload({
@@ -489,6 +498,7 @@ export async function registerRoutes(
       commercial,
       deploymentIssues,
       records: recordConfiguration,
+      sessions: sessionConfiguration,
     }));
   });
 
@@ -589,6 +599,7 @@ export async function registerRoutes(
           : fishAvailable ? "configured provider" : "browser audio",
       },
       records: recordsStatus(),
+      sessions: webSessionStatus(),
       product: publicProductConfig(),
       localization: {
         defaultLocale: DEFAULT_LOCALE,
@@ -622,7 +633,7 @@ export async function registerRoutes(
         state: parsedState,
       });
       assertValidUploadedAudio(req.file);
-      webLease = beginWebTurn(payload.callId, payload.locale, payload.turnId);
+      webLease = await beginWebTurn(payload.callId, payload.locale, payload.turnId);
 
       await assertUsageAvailable();
 
@@ -833,7 +844,7 @@ export async function registerRoutes(
       }
 
       const { callId, usageTurnId } = webLease;
-      commitWebTurn(webLease, state, transcript, reply.trim());
+      await commitWebTurn(webLease, state, transcript, reply.trim());
       webLease = null;
       const usage = await recordUsage({
         turnId: usageTurnId,
@@ -866,7 +877,7 @@ export async function registerRoutes(
       });
       return res.end();
     } finally {
-      abortWebTurn(webLease);
+      await abortWebTurn(webLease);
       if (usageReservation && abandonedUsage) {
         await recordAbandonedUsage({
           turnId: abandonedUsage.usageTurnId,
@@ -908,7 +919,7 @@ export async function registerRoutes(
         state: parsedState,
       });
       assertValidUploadedAudio(req.file);
-      webLease = beginWebTurn(payload.callId, payload.locale, payload.turnId);
+      webLease = await beginWebTurn(payload.callId, payload.locale, payload.turnId);
 
       await assertUsageAvailable();
 
@@ -983,7 +994,7 @@ export async function registerRoutes(
       }
 
       const { callId, usageTurnId } = webLease;
-      commitWebTurn(webLease, state, transcript, reply.trim());
+      await commitWebTurn(webLease, state, transcript, reply.trim());
       webLease = null;
       const usage = await recordUsage({
         turnId: usageTurnId,
@@ -1013,7 +1024,7 @@ export async function registerRoutes(
     } catch (error) {
       next(error);
     } finally {
-      abortWebTurn(webLease);
+      await abortWebTurn(webLease);
       if (usageReservation && abandonedUsage) {
         await recordAbandonedUsage({
           turnId: abandonedUsage.usageTurnId,

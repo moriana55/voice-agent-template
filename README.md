@@ -59,6 +59,7 @@ Important implementation paths:
 - [`server/records.ts`](server/records.ts) — retention, encrypted records, and integrations
 - [`server/integrations.ts`](server/integrations.ts) — Twilio, Google Calendar, HubSpot, Stripe, and generic webhook adapters
 - [`server/usage.ts`](server/usage.ts) — server-side active-voice metering, summaries, and monthly quota enforcement
+- [`server/web-sessions.ts`](server/web-sessions.ts) — server-authoritative turns with optional encrypted restart persistence
 - [`server/product.ts`](server/product.ts) — safe public white-label configuration and paid-customer readiness gate
 - [`client/src/App.tsx`](client/src/App.tsx) — recording, interruption, streaming playback, and operator UI
 
@@ -104,6 +105,12 @@ npm test
 npm run build
 ```
 
+The bounded load smoke refuses provider-backed targets by default so an accidental run cannot create model or speech charges. Against an isolated demo-mode server, run:
+
+```bash
+LOAD_BASE_URL=http://127.0.0.1:5193 npm run smoke:load
+```
+
 For the production HTTP/Twilio smoke flow, start the production bundle with isolated test environment values, then run:
 
 ```bash
@@ -122,7 +129,7 @@ The repository includes [`railway.json`](railway.json) and a multi-stage [`Docke
 4. For call records that survive deployments, attach a Railway volume at `/app/data` and set `DATA_DIR=/app/data`.
 5. Run a prepared appointment scenario and verify `/api/status` before sharing the URL.
 
-For a paid customer deployment, set `CUSTOMER_MODE=true`, `WEB_REPLICA_COUNT=1`, and complete every customer/product variable in `.env.example`. Production startup and readiness fail closed if branding, privacy contact, 32+ character encryption/admin credentials, provider intelligence, allowed origins, or a positive monthly usage limit is missing. Add a shared session store before increasing the replica count.
+For a paid customer deployment, set `CUSTOMER_MODE=true`, `WEB_REPLICA_COUNT=1`, `WEB_SESSION_STORAGE=encrypted-file`, and complete every customer/product variable in `.env.example`. Production startup and readiness fail closed if branding, privacy contact, 32+ character encryption/admin credentials, encrypted restart-persistent web sessions, provider intelligence, allowed origins, or a positive monthly usage limit is missing. The encrypted file backend is durable on the attached volume but not shared; add a networked session store before increasing the replica count.
 
 Railway provides the runtime `PORT`; the server already binds it on `0.0.0.0`.
 

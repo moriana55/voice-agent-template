@@ -40,6 +40,8 @@ jobs:
           ADMIN_API_KEY: ci-smoke-admin-key-01234567890123456789
           DATA_ENCRYPTION_KEY: ci-smoke-encryption-key-0123456789012345
           DATA_DIR: ${{ runner.temp }}/voiceops-smoke-data
+          WEB_SESSION_STORAGE: encrypted-file
+          TURN_RATE_LIMIT: "200"
           TWILIO_AUTH_TOKEN: smoke-twilio
           TELEPHONY_RECORD_STORAGE: enabled
           PUBLIC_BASE_URL: ""
@@ -62,6 +64,13 @@ jobs:
           SMOKE_ADMIN_KEY: ci-smoke-admin-key-01234567890123456789
           SMOKE_TWILIO_TOKEN: smoke-twilio
         run: npm run smoke:http
+      - name: Verify bounded single-replica load
+        env:
+          LOAD_BASE_URL: http://127.0.0.1:5193
+          LOAD_TOTAL: "80"
+          LOAD_CONCURRENCY: "4"
+          LOAD_MAX_P95_MS: "750"
+        run: npm run smoke:load
       - name: Stop smoke server
         if: always()
         run: |

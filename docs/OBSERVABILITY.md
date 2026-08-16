@@ -20,6 +20,7 @@ This document defines the minimum operator evidence for VoiceOps Studio. Logs an
 | Record retention failure | `record_retention_failed` structured event | Volume state and retention configuration | Stop customer onboarding, preserve the volume, correct configuration, rerun pruning |
 | Integration delivery failure | `integration_delivery_failed` or `integration_webhook_failed` | Integration name and safe error category | Disable affected integration if necessary; retry only with the same idempotency key |
 | Capacity or abuse | HTTP 429 responses, quota and concurrency rejection | Usage report, bounded rate/concurrency settings | Verify legitimate traffic, adjust contractual limits only through a reviewed change |
+| Session store unreadable | Deployment fails with `startup_rejected` before listening | Encrypted session file and encryption-key version | Preserve the volume, restore the matching key or known-good backup; never replace the store silently |
 
 ## Automated monitors
 
@@ -48,3 +49,4 @@ GitHub issue/email delivery depends on repository notification settings and must
 4. Confirm liveness/readiness pass and the incident is closed with a recovery link.
 5. Dispatch with `run_voice_synthetic=true` and confirm `meta`, `text_delta`, `audio`, and `done` events.
 6. Confirm Railway runtime error logs and HTTP 5xx logs remain empty after the checks.
+7. Run the isolated demo-mode load smoke and retain its request count, concurrency, error rate, and p95 result with the release evidence.
