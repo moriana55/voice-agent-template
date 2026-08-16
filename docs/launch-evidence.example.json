@@ -1,11 +1,12 @@
 {
   "format": "voiceops-launch-evidence",
-  "version": 1,
+  "version": 2,
   "environment": {
     "kind": "customer",
     "name": "replace-with-customer-environment-name",
     "origin": "https://replace-with-customer-origin.example.com",
-    "deployedRevision": "replace-with-reviewed-40-character-git-sha"
+    "deployedRevision": "replace-with-reviewed-40-character-git-sha",
+    "railwayDeploymentId": "replace-with-approved-railway-deployment-uuid"
   },
   "approvals": {
     "businessIdentity": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
