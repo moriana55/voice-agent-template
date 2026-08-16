@@ -6,12 +6,14 @@ Railway's native volume backups are the preferred recovery path when the workspa
 
 - `script/encrypted-backup.mjs` streams `tar` output directly through AES-256-GCM.
 - The backup key is derived with scrypt and must come from a permission-`0600` file containing at least 32 characters.
-- Every backup has a non-secret manifest with the encrypted byte count and SHA-256 transport checksum. AES-GCM authenticates the archive itself.
+- Every new backup has a non-secret version-2 manifest with the encrypted byte count and SHA-256 transport checksum. AES-GCM authenticates the archive, while an HMAC key-separated from the backup encryption key authenticates the manifest metadata, including its creation time and source kind.
 - Creation automatically decrypts and lists the archive, rejects traversal, symbolic links, and special-file entries, then retains the backup only if verification passes.
 - Restore verifies the backup first, extracts into a new staging directory, validates the restored tree, and atomically renames it. It refuses an existing destination.
 - The backup passphrase and the application's `DATA_ENCRYPTION_KEY` are separate recovery secrets. Both are required to recover and read encrypted customer records.
 
 Keep the backup, manifest, and recovery secrets outside the repository. Store the backup passphrase separately from the backup object.
+
+Legacy version-1 manifests remain decryptable for recovery compatibility, but their metadata is not authenticated and they are therefore rejected as paid-customer launch evidence. Create a fresh version-2 Railway stream before launch.
 
 ## Create a local fixture backup
 

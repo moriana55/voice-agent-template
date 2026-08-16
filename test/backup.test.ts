@@ -43,12 +43,35 @@ test("şifreli volume backup doğrulanır, bozulma reddedilir ve izole dizine ge
 
     const created = await runBackup("create", "--source", source, "--output", backup, "--key-file", keyFile);
     assert.equal(created.ok, true);
-    assert.equal((created.manifest as { sourceKind: string }).sourceKind, "local-directory");
+    assert.equal(created.manifestAuthenticated, true);
+    assert.equal((created.manifest as { version: number; sourceKind: string }).version, 2);
+    assert.equal((created.manifest as { version: number; sourceKind: string }).sourceKind, "local-directory");
     assert.doesNotMatch((await readFile(backup)).toString("utf8"), /customer-private-record/u);
 
     const verified = await runBackup("verify", "--backup", backup, "--key-file", keyFile);
     assert.equal(verified.ok, true);
+    assert.equal(verified.manifestAuthenticated, true);
     assert.ok(Number(verified.entries) >= 3);
+
+    const metadataTampered = path.join(root, "metadata-tampered.vopsbackup");
+    await copyFile(backup, metadataTampered);
+    const metadataManifest = JSON.parse(await readFile(`${backup}.manifest.json`, "utf8"));
+    metadataManifest.sourceKind = "railway-volume-stream";
+    await writeFile(`${metadataTampered}.manifest.json`, `${JSON.stringify(metadataManifest, null, 2)}\n`, { mode: 0o600 });
+    await assert.rejects(
+      runBackup("verify", "--backup", metadataTampered, "--key-file", keyFile),
+      /manifest authentication failed/i,
+    );
+
+    const legacyBackup = path.join(root, "legacy-v1.vopsbackup");
+    await copyFile(backup, legacyBackup);
+    const legacyManifest = JSON.parse(await readFile(`${backup}.manifest.json`, "utf8"));
+    legacyManifest.version = 1;
+    delete legacyManifest.authentication;
+    await writeFile(`${legacyBackup}.manifest.json`, `${JSON.stringify(legacyManifest, null, 2)}\n`, { mode: 0o600 });
+    const legacyVerified = await runBackup("verify", "--backup", legacyBackup, "--key-file", keyFile);
+    assert.equal(legacyVerified.ok, true);
+    assert.equal(legacyVerified.manifestAuthenticated, false);
 
     await assert.rejects(
       runBackup("verify", "--backup", backup, "--key-file", wrongKeyFile),

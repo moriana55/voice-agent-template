@@ -70,7 +70,7 @@ npm run launch:gate -- \
   --output /secure/evidence/customer-launch-report.json
 ```
 
-The encrypted backup must have been streamed from the Railway volume, be at most 24 hours old by default, and pass checksum, AES-GCM authentication, archive-path, and archive-type verification. Use `--backup-max-age-hours` only to set an explicitly approved value from 1 to 168 hours. The output is a non-secret, permission-`0600` report containing the target origin, evidence hash, reviewed revision, backup checksum, and each pass/fail result. The command refuses to overwrite an existing report and exits non-zero on any failed gate. A green report is necessary but does not replace the recorded approvals referenced by the evidence file.
+The encrypted backup must have been streamed from the Railway volume, have a cryptographically authenticated version-2 manifest, be at most 24 hours old by default, and pass checksum, AES-GCM authentication, archive-path, and archive-type verification. Use `--backup-max-age-hours` only to set an explicitly approved value from 1 to 168 hours. The output is a non-secret, permission-`0600` report containing the target origin, evidence hash, reviewed revision, backup checksum, and each pass/fail result. The command refuses to overwrite an existing report and exits non-zero on any failed gate. A green report is necessary but does not replace the recorded approvals referenced by the evidence file.
 
 ## Launch blockers in the current public environment
 

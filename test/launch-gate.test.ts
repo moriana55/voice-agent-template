@@ -129,7 +129,9 @@ test("launch gate yerel fixture backup'ını production recovery kanıtı saymaz
   assert.throws(() => validateBackupVerification({
     ok: true,
     entries: 3,
+    manifestAuthenticated: true,
     manifest: {
+      version: 2,
       sourceKind: "local-directory",
       createdAt: "2026-08-16T00:00:00.000Z",
       sha256: "b".repeat(64),
@@ -141,7 +143,9 @@ test("launch gate eski Railway backup'ını güncel recovery kanıtı saymaz", (
   assert.throws(() => validateBackupVerification({
     ok: true,
     entries: 3,
+    manifestAuthenticated: true,
     manifest: {
+      version: 2,
       sourceKind: "railway-volume-stream",
       createdAt: "2026-08-01T00:00:00.000Z",
       sha256: "b".repeat(64),
