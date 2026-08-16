@@ -2,6 +2,7 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createHmac,
   randomBytes,
   randomUUID,
   scrypt,
@@ -41,8 +42,8 @@ function fail(message) {
 }
 
 async function readPassphrase(keyFile) {
-  const file = await stat(keyFile);
-  if (!file.isFile()) fail("Backup key path must be a regular file.");
+  const file = await lstat(keyFile);
+  if (!file.isFile() || file.isSymbolicLink()) fail("Backup key path must be a regular file.");
   if (process.platform !== "win32" && (file.mode & 0o077) !== 0) {
     fail("Backup key file must not be readable or writable by group/others (chmod 600).");
   }
@@ -147,6 +148,32 @@ async function encryptedFileMetadata(backupPath) {
   return { encryptedBytes: bytes, sha256: hash.digest("hex") };
 }
 
+async function deriveBackupEncryptionKey(backupPath, passphrase) {
+  const details = await stat(backupPath);
+  if (!details.isFile() || details.size <= HEADER_BYTES + TAG_BYTES) fail("Backup file is truncated or invalid.");
+  const handle = await open(backupPath, "r");
+  try {
+    const header = Buffer.alloc(HEADER_BYTES);
+    await handle.read({ buffer: header, position: 0 });
+    const magic = header.subarray(0, MAGIC.length);
+    if (magic.length !== MAGIC.length || !timingSafeEqual(magic, MAGIC)) fail("Unsupported backup format.");
+    const salt = header.subarray(MAGIC.length, MAGIC.length + SALT_BYTES);
+    return deriveKey(passphrase, salt, 32, SCRYPT_OPTIONS);
+  } finally {
+    await handle.close();
+  }
+}
+
+async function manifestAuthentication(backupPath, passphrase, manifest) {
+  const encryptionKey = await deriveBackupEncryptionKey(backupPath, passphrase);
+  const authenticationKey = createHmac("sha256", encryptionKey)
+    .update("voiceops-backup-manifest-v2", "utf8")
+    .digest();
+  return createHmac("sha256", authenticationKey)
+    .update(JSON.stringify(manifest), "utf8")
+    .digest("hex");
+}
+
 async function decryptionStream(backupPath, passphrase) {
   const details = await stat(backupPath);
   if (!details.isFile() || details.size <= HEADER_BYTES + TAG_BYTES) fail("Backup file is truncated or invalid.");
@@ -243,41 +270,65 @@ function validateArchiveTypes(listing) {
   }
 }
 
-async function verifyManifest(backupPath) {
+async function verifyManifest(backupPath, passphrase) {
   const manifestPath = `${backupPath}.manifest.json`;
   if (!(await pathExists(manifestPath))) return null;
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  if (manifest.format !== "voiceops-encrypted-backup" || manifest.version !== 1) {
+  if (manifest.format !== "voiceops-encrypted-backup" || ![1, 2].includes(manifest.version)) {
     fail("Backup manifest format is invalid.");
   }
   const actual = await encryptedFileMetadata(backupPath);
   if (manifest.encryptedBytes !== actual.encryptedBytes || manifest.sha256 !== actual.sha256) {
     fail("Backup manifest checksum does not match the encrypted archive.");
   }
-  return manifest;
+  if (manifest.version === 1) return { manifest, authenticated: false };
+  const { authentication, ...unsignedManifest } = manifest;
+  if (authentication?.algorithm !== "HMAC-SHA-256"
+    || !/^[0-9a-f]{64}$/i.test(authentication.value || "")) {
+    fail("Backup manifest authentication metadata is invalid.");
+  }
+  const expected = Buffer.from(await manifestAuthentication(backupPath, passphrase, unsignedManifest), "hex");
+  const provided = Buffer.from(authentication.value, "hex");
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+    fail("Backup manifest authentication failed.");
+  }
+  return { manifest, authenticated: true };
 }
 
 export async function verifyBackup({ backupPath, keyFile }) {
   const passphrase = await readPassphrase(keyFile);
-  const manifest = await verifyManifest(backupPath);
+  const manifestResult = await verifyManifest(backupPath, passphrase);
   const names = await runTarRead(backupPath, passphrase, ["-tzf", "-"], "Archive name verification");
   const entries = validateArchiveNames(await names);
   const verbose = await runTarRead(backupPath, passphrase, ["-tvzf", "-"], "Archive type verification");
   validateArchiveTypes(await verbose);
-  return { ok: true, entries, manifest };
+  return {
+    ok: true,
+    entries,
+    manifest: manifestResult?.manifest || null,
+    manifestAuthenticated: manifestResult?.authenticated || false,
+  };
 }
 
-async function writeManifest(backupPath, sourceKind, sourceSummary) {
+async function writeManifest(backupPath, keyFile, sourceKind, sourceSummary) {
   const metadata = await encryptedFileMetadata(backupPath);
-  const manifest = {
+  const unsignedManifest = {
     format: "voiceops-encrypted-backup",
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
     sourceKind,
     cipher: "AES-256-GCM",
     kdf: { name: "scrypt", N: SCRYPT_OPTIONS.N, r: SCRYPT_OPTIONS.r, p: SCRYPT_OPTIONS.p },
     ...metadata,
     sourceSummary,
+  };
+  const passphrase = await readPassphrase(keyFile);
+  const manifest = {
+    ...unsignedManifest,
+    authentication: {
+      algorithm: "HMAC-SHA-256",
+      value: await manifestAuthentication(backupPath, passphrase, unsignedManifest),
+    },
   };
   await writeFile(`${backupPath}.manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`, {
     flag: "wx",
@@ -288,7 +339,7 @@ async function writeManifest(backupPath, sourceKind, sourceSummary) {
 
 async function finalizeCreatedBackup({ backupPath, keyFile, sourceKind, sourceSummary }) {
   try {
-    const manifest = await writeManifest(backupPath, sourceKind, sourceSummary);
+    const manifest = await writeManifest(backupPath, keyFile, sourceKind, sourceSummary);
     const verification = await verifyBackup({ backupPath, keyFile });
     return { ...verification, manifest };
   } catch (error) {

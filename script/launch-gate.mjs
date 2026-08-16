@@ -109,8 +109,9 @@ export function validateBackupVerification(value, maximumAgeHours = 24, now = Da
   if (value?.ok !== true || !Number.isInteger(value.entries) || value.entries < 1) {
     fail("Encrypted backup verification did not succeed.");
   }
+  if (value.manifestAuthenticated !== true) fail("Launch backup manifest must be cryptographically authenticated.");
   const manifest = value.manifest;
-  if (!manifest || manifest.sourceKind !== "railway-volume-stream") {
+  if (!manifest || manifest.version !== 2 || manifest.sourceKind !== "railway-volume-stream") {
     fail("Launch backup must be a verified Railway volume stream, not a local fixture.");
   }
   if (!/^[0-9a-f]{64}$/i.test(manifest.sha256 || "")) fail("Launch backup manifest SHA-256 is invalid.");
