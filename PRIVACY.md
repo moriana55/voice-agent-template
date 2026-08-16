@@ -31,6 +31,8 @@ kayıtlarına daha uzun süreli olarak yazılır.
   sunucu da `noticeAcknowledged=true` olmayan web isteklerini reddeder.
 - Kayıt/aktarım izni `storageConsent` ile bilgilendirme kabulünden ayrı tutulur.
 - Twilio karşılama mesajı görüşmenin yapay zekâ servisleriyle işleneceğini bildirir.
+  Aktif telefon görüşmesinin son başarılı durumu, telefon hattı yapılandırıldığında
+  ayrı bir şifreli ve TTL sınırlı geçici oturum dosyasında tutulur.
   Telefon kaydı `TELEPHONY_RECORD_STORAGE=enabled` açıkça ayarlanana kadar kapalıdır.
 - Faturalama sayacı ham içerik yerine çağrının özetlenmiş aktif ses saniyesini ve
   tek yönlü çağrı kimliği özetini saklar.

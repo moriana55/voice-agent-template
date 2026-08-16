@@ -22,6 +22,7 @@ This document defines the minimum operator evidence for VoiceOps Studio. Logs an
 | Capacity or abuse | HTTP 429 responses, quota and concurrency rejection | Usage report, bounded rate/concurrency settings | Verify legitimate traffic, adjust contractual limits only through a reviewed change |
 | Session store unreadable | Deployment fails with `startup_rejected` before listening | Encrypted session file and encryption-key version | Preserve the volume, restore the matching key or known-good backup; never replace the store silently |
 | Session retention failure | `web_session_prune_failed` structured event | Volume permissions, encryption key, session file integrity | Stop onboarding, preserve the volume, correct the cause, and verify TTL pruning before restoring traffic |
+| Telephone session retention failure | `telephony_session_prune_failed` structured event | Volume permissions, encryption key, telephone session integrity | Keep the phone number out of service, preserve evidence, and verify restart plus TTL behavior before reopening |
 
 ## Automated monitors
 

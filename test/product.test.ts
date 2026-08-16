@@ -62,6 +62,9 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     "RECORD_RETENTION_DAYS", "RECORD_PRUNE_INTERVAL_MS", "TURN_RATE_LIMIT",
     "TURN_MAX_CONCURRENCY", "WEB_SESSION_LIMIT", "WEB_SESSION_STORAGE", "WEB_SESSION_TTL_MINUTES",
     "WEB_SESSION_PRUNE_INTERVAL_MS", "APPOINTMENT_DURATION_MINUTES",
+    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
+    "TELEPHONY_SESSION_STORAGE", "TELEPHONY_SESSION_TTL_MINUTES",
+    "TELEPHONY_SESSION_PRUNE_INTERVAL_MS", "TELEPHONY_SESSION_LIMIT",
     "BUSINESS_TIME_ZONE", "GRACEFUL_SHUTDOWN_MS", "PORT",
   ] as const;
   const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
@@ -89,6 +92,13 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     delete process.env.TURN_RATE_LIMIT;
     delete process.env.TURN_MAX_CONCURRENCY;
     delete process.env.WEB_SESSION_LIMIT;
+    delete process.env.TWILIO_ACCOUNT_SID;
+    delete process.env.TWILIO_AUTH_TOKEN;
+    delete process.env.TWILIO_PHONE_NUMBER;
+    delete process.env.TELEPHONY_SESSION_STORAGE;
+    delete process.env.TELEPHONY_SESSION_TTL_MINUTES;
+    delete process.env.TELEPHONY_SESSION_PRUNE_INTERVAL_MS;
+    delete process.env.TELEPHONY_SESSION_LIMIT;
     delete process.env.APPOINTMENT_DURATION_MINUTES;
     delete process.env.BUSINESS_TIME_ZONE;
     delete process.env.GRACEFUL_SHUTDOWN_MS;
@@ -108,6 +118,17 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     assert.deepEqual(deploymentSafetyIssues(), []);
     assert.doesNotThrow(assertProductionConfiguration);
 
+    process.env.TWILIO_ACCOUNT_SID = "AC-test";
+    process.env.TWILIO_AUTH_TOKEN = "twilio-test-token";
+    process.env.TWILIO_PHONE_NUMBER = "+15551234567";
+    process.env.PUBLIC_BASE_URL = "https://voice.example.com";
+    const ephemeralPhoneIssues = deploymentSafetyIssues();
+    assert.ok(ephemeralPhoneIssues.includes("TELEPHONY_SESSION_STORAGE=encrypted-file"));
+    assert.ok(ephemeralPhoneIssues.includes("TELEPHONY_SESSION_TTL_MINUTES"));
+    process.env.TELEPHONY_SESSION_STORAGE = "encrypted-file";
+    process.env.TELEPHONY_SESSION_TTL_MINUTES = "120";
+    assert.deepEqual(deploymentSafetyIssues(), []);
+
     process.env.CRM_WEBHOOK_URL = "https://crm.example.com/hook";
     process.env.INTEGRATION_WEBHOOK_ALLOWED_HOSTS = "crm.example.com";
     delete process.env.CRM_WEBHOOK_TOKEN;
@@ -124,6 +145,9 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     process.env.TURN_MAX_CONCURRENCY = "0";
     process.env.WEB_SESSION_TTL_MINUTES = "1";
     process.env.WEB_SESSION_PRUNE_INTERVAL_MS = "10";
+    process.env.TELEPHONY_SESSION_TTL_MINUTES = "2";
+    process.env.TELEPHONY_SESSION_PRUNE_INTERVAL_MS = "10";
+    process.env.TELEPHONY_SESSION_LIMIT = "0";
     process.env.APPOINTMENT_DURATION_MINUTES = "241";
     process.env.BUSINESS_TIME_ZONE = "Mars/Olympus_Mons";
     process.env.GRACEFUL_SHUTDOWN_MS = "999";
@@ -138,6 +162,9 @@ test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olm
     assert.ok(malformedIssues.some((issue) => issue.startsWith("TURN_MAX_CONCURRENCY(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("WEB_SESSION_TTL_MINUTES(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("WEB_SESSION_PRUNE_INTERVAL_MS(")));
+    assert.ok(malformedIssues.some((issue) => issue.startsWith("TELEPHONY_SESSION_TTL_MINUTES(")));
+    assert.ok(malformedIssues.some((issue) => issue.startsWith("TELEPHONY_SESSION_PRUNE_INTERVAL_MS(")));
+    assert.ok(malformedIssues.some((issue) => issue.startsWith("TELEPHONY_SESSION_LIMIT(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("APPOINTMENT_DURATION_MINUTES(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("BUSINESS_TIME_ZONE(")));
     assert.ok(malformedIssues.some((issue) => issue.startsWith("GRACEFUL_SHUTDOWN_MS(")));
