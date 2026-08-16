@@ -1,3 +1,3 @@
-// Bu prototip görüşme geçmişini istemcide tutar. Kalıcı kayıt gerektiğinde bu
-// dosya Postgres/CRM adaptörü için ayrılmıştır.
+// Aktif görüşme durumu server/web-sessions.ts içinde sunucu otoritesiyle tutulur.
+// Kalıcı/çok örnekli oturum gerektiğinde bu dosya ortak veri deposu adaptörü içindir.
 export const storage = {};

@@ -4,16 +4,22 @@ import twilio from "twilio";
 import { createGatherResponse, validateTwilioWebhook } from "../server/telephony";
 
 test("TwiML Türkçe konuşma toplar ve dönüş endpointine yönlendirir", () => {
-  const xml = createGatherResponse("Merhaba", null, "tr");
+  const turnId = "11111111-1111-4111-8111-111111111111";
+  const xml = createGatherResponse("Merhaba", null, "tr", turnId);
   assert.match(xml, /<Gather/);
   assert.match(xml, /input="speech"/);
   assert.match(xml, /language="tr-TR"/);
-  assert.match(xml, /action="\/api\/telephony\/turn"/);
+  assert.ok(xml.includes(`action="/api/telephony/turn?turnId=${turnId}"`));
   assert.match(xml, /<Say language="tr-TR">Merhaba<\/Say>/);
 });
 
 test("TwiML seçilen dil kodunu konuşma tanıma ve seslendirmeye taşır", () => {
-  const xml = createGatherResponse("Bonjour", null, "fr");
+  const xml = createGatherResponse(
+    "Bonjour",
+    null,
+    "fr",
+    "22222222-2222-4222-8222-222222222222",
+  );
   assert.match(xml, /language="fr-FR"/);
   assert.match(xml, /<Say language="fr-FR">Bonjour<\/Say>/);
 });
@@ -68,6 +74,40 @@ test("hatalı Twilio imzasını reddeder", () => {
   const req = {
     originalUrl: "/api/telephony/incoming", protocol: "https", body: { CallSid: "CA123" },
     get(name: string) { return name.toLowerCase() === "x-twilio-signature" ? "invalid" : "voice.example.com"; },
+  };
+  const res = {
+    statusCode: 200,
+    status(code: number) { this.statusCode = code; return this; },
+    send() { return this; },
+  };
+  validateTwilioWebhook(req as never, res as never, () => { nextCalled = true; });
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 403);
+});
+
+test("trusted proxy kapalıyken Twilio imzası forwarded host ile şaşırtılamaz", () => {
+  const token = "test-auth-token";
+  const body = { CallSid: "CA123" };
+  delete process.env.PUBLIC_BASE_URL;
+  process.env.TRUST_PROXY = "false";
+  process.env.TWILIO_AUTH_TOKEN = token;
+  const signature = twilio.getExpectedTwilioSignature(
+    token,
+    "https://attacker.example/api/telephony/incoming",
+    body,
+  );
+  let nextCalled = false;
+  const req = {
+    originalUrl: "/api/telephony/incoming",
+    protocol: "https",
+    body,
+    get(name: string) {
+      if (name.toLowerCase() === "x-twilio-signature") return signature;
+      if (name.toLowerCase() === "x-forwarded-proto") return "https";
+      if (name.toLowerCase() === "x-forwarded-host") return "attacker.example";
+      if (name.toLowerCase() === "host") return "voice.example.com";
+      return undefined;
+    },
   };
   const res = {
     statusCode: 200,

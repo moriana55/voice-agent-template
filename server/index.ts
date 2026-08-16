@@ -5,6 +5,8 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { randomUUID } from "node:crypto";
 import { apiLimiter, sameOriginOnly, securityHeaders } from "./security";
+import { assertProductionConfiguration } from "./product";
+import { listenHttpServer, shutdownHttpServer } from "./lifecycle";
 
 const app = express();
 const httpServer = createServer(app);
@@ -67,7 +69,8 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+async function start() {
+  assertProductionConfiguration();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -110,13 +113,33 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5177", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-})();
+  await listenHttpServer(httpServer, port, "0.0.0.0");
+  log(`serving on port ${port}`);
+
+  let shuttingDown = false;
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(JSON.stringify({ level: "info", event: "shutdown_started", signal }));
+    const timeoutMs = Number(process.env.GRACEFUL_SHUTDOWN_MS || 9_000);
+    const result = await shutdownHttpServer(httpServer, timeoutMs);
+    console.log(JSON.stringify({
+      level: result.error || result.forced ? "error" : "info",
+      event: "shutdown_completed",
+      forced: result.forced,
+      message: result.error?.message || null,
+    }));
+    process.exit(result.error || result.forced ? 1 : 0);
+  };
+  process.once("SIGTERM", () => void shutdown("SIGTERM"));
+  process.once("SIGINT", () => void shutdown("SIGINT"));
+}
+
+void start().catch((error) => {
+  console.error(JSON.stringify({
+    level: "fatal",
+    event: "startup_rejected",
+    message: error instanceof Error ? error.message : "Application startup failed",
+  }));
+  process.exit(1);
+});

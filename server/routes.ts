@@ -9,11 +9,12 @@ import {
 } from "./dil.js";
 import type { Express, Response } from "express";
 import type { Server } from "http";
-import { randomUUID } from "node:crypto";
 import multer from "multer";
 import OpenAI, { toFile } from "openai";
 import { FishAudioClient, FlushEvent, RealtimeEvents, type Backends } from "fish-audio";
 import {
+  checkoutSessionRequestSchema,
+  outboundCallRequestSchema,
   turnRequestSchema,
   type CallState,
   type ConversationMessage,
@@ -26,17 +27,41 @@ import {
   recordCompletedCall,
   recordsStatus,
 } from "./records";
-import { requireAdmin, turnLimiter } from "./security";
+import { requireAdmin, turnConcurrencyLimiter, turnLimiter } from "./security";
 import { synthesizeFishBuffer } from "./fish";
 import { registerTelephonyRoutes } from "./telephony";
-import { commercialReadiness, publicProductConfig } from "./product";
-import { assertUsageAvailable, recordUsage, usageSummary, wavDurationSeconds } from "./usage";
+import {
+  commercialReadiness,
+  deploymentSafetyIssues,
+  publicProductConfig,
+  publicReadinessPayload,
+} from "./product";
+import {
+  assertUsageAvailable,
+  estimateSpeechSeconds,
+  recordAbandonedUsage,
+  recordUsage,
+  releaseUsageReservation,
+  reserveUsage,
+  usageSummary,
+  wavDurationSeconds,
+} from "./usage";
+import {
+  createOutboundCall,
+  createStripeCheckout,
+  integrationStatuses,
+  processStripeWebhook,
+} from "./integrations";
+import { abortWebTurn, beginWebTurn, commitWebTurn, type WebTurnLease } from "./web-sessions";
+import { assertValidUploadedAudio, supportedAudioMimeTypes } from "./audio-validation";
+import { publicStreamErrorMessage } from "./error-safety";
+import { isServerDraining } from "./lifecycle";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024, files: 1, fields: 10, fieldSize: 100 * 1024 },
   fileFilter: (_req, file, callback) => {
-    if (file.mimetype.startsWith("audio/")) callback(null, true);
+    if (supportedAudioMimeTypes.has(file.mimetype.split(";", 1)[0].trim().toLowerCase())) callback(null, true);
     else callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
   },
 });
@@ -428,6 +453,19 @@ export async function registerRoutes(
 ): Promise<Server> {
   registerTelephonyRoutes(app);
   await pruneExpiredRecords();
+  const configuredPruneInterval = Number(process.env.RECORD_PRUNE_INTERVAL_MS || 6 * 60 * 60 * 1000);
+  const pruneIntervalMs = Number.isFinite(configuredPruneInterval)
+    ? Math.max(60_000, configuredPruneInterval)
+    : 6 * 60 * 60 * 1000;
+  const pruneTimer = setInterval(() => {
+    void pruneExpiredRecords().catch((error) => console.error(JSON.stringify({
+      level: "error",
+      event: "record_retention_failed",
+      message: error instanceof Error ? error.message : "Record retention failed",
+    })));
+  }, pruneIntervalMs);
+  pruneTimer.unref();
+  httpServer.once("close", () => clearInterval(pruneTimer));
   app.get("/api/health/live", (_req, res) => {
     res.json({ ok: true, uptimeSeconds: Math.round(process.uptime()) });
   });
@@ -441,24 +479,58 @@ export async function registerRoutes(
     const privacyReady = !recordConfiguration.enabled || recordConfiguration.encrypted
       || process.env.NODE_ENV !== "production";
     const commercial = commercialReadiness();
-    const ready = fishAudio && brain && privacyReady && commercial.ready;
-    res.status(ready ? 200 : 503).json({
+    const deploymentIssues = deploymentSafetyIssues();
+    const ready = !isServerDraining()
+      && fishAudio && brain && privacyReady && commercial.ready && deploymentIssues.length === 0;
+    res.status(ready ? 200 : 503).json(publicReadinessPayload({
       ready,
       services: { fishAudio, brain },
       privacyReady,
       commercial,
+      deploymentIssues,
       records: recordConfiguration,
-    });
+    }));
   });
 
   app.get("/api/product", (_req, res) => {
     res.json(publicProductConfig());
   });
 
+  app.post("/api/integrations/stripe/webhook", async (req, res, next) => {
+    try {
+      const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(JSON.stringify(req.body || {}));
+      const signature = req.get("stripe-signature") || "";
+      return res.json(await processStripeWebhook(rawBody, signature));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.get("/api/admin/integrations", requireAdmin, (_req, res) => {
+    res.json({ integrations: integrationStatuses() });
+  });
+
+  app.post("/api/admin/telephony/outbound", requireAdmin, async (req, res, next) => {
+    try {
+      const input = outboundCallRequestSchema.parse(req.body);
+      return res.status(201).json(await createOutboundCall(input));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post("/api/admin/billing/checkout", requireAdmin, async (req, res, next) => {
+    try {
+      const input = checkoutSessionRequestSchema.parse(req.body);
+      return res.status(201).json(await createStripeCheckout(input.email));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.get("/api/admin/records", requireAdmin, async (req, res, next) => {
     try {
-      const limit = Number(req.query.limit || 100);
-      return res.json({ records: await listCallRecords(limit) });
+      return res.json({ records: await listCallRecords(req.query.limit) });
     } catch (error) {
       return next(error);
     }
@@ -487,7 +559,8 @@ export async function registerRoutes(
     const anthropicAvailable = providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY));
     const openaiAvailable = providerAvailable("openai", Boolean(process.env.OPENAI_API_KEY));
     const fishAvailable = providerAvailable("fishAudio", fishEnabled);
-    const credit = getFishCredit();
+    const exposeProviderDetails = process.env.EXPOSE_PROVIDER_STATUS === "true";
+    const credit = exposeProviderDetails ? getFishCredit() : null;
     res.json({
       mode: currentMode(demo, fishEnabled),
       credit,
@@ -499,15 +572,21 @@ export async function registerRoutes(
         voice: Boolean(voiceId(DEFAULT_LOCALE)),
       },
       models: {
-        llm: anthropicAvailable
-          ? process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
-          : openaiAvailable
-            ? process.env.OPENAI_MODEL || "gpt-5.4-mini"
-            : "yerel senaryo motoru",
-        transcription: openaiAvailable
-          ? process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe"
-          : fishAvailable ? "fish transcribe-1" : "tarayıcı metin girişi",
-        speech: process.env.FISH_AUDIO_MODEL || "s2-pro",
+        llm: exposeProviderDetails
+          ? anthropicAvailable
+            ? process.env.ANTHROPIC_MODEL || "configured anthropic model"
+            : openaiAvailable
+              ? process.env.OPENAI_MODEL || "configured openai model"
+              : "local scenario engine"
+          : anthropicAvailable || openaiAvailable ? "configured provider" : "local scenario engine",
+        transcription: exposeProviderDetails
+          ? openaiAvailable
+            ? process.env.OPENAI_TRANSCRIBE_MODEL || "configured transcription model"
+            : fishAvailable ? "configured fish transcription" : "browser text input"
+          : openaiAvailable || fishAvailable ? "configured provider" : "browser text input",
+        speech: exposeProviderDetails
+          ? process.env.FISH_AUDIO_MODEL || "configured speech model"
+          : fishAvailable ? "configured provider" : "browser audio",
       },
       records: recordsStatus(),
       product: publicProductConfig(),
@@ -518,9 +597,12 @@ export async function registerRoutes(
     });
   });
 
-  app.post("/api/turn/stream", turnLimiter, upload.single("audio"), async (req, res, next) => {
+  app.post("/api/turn/stream", turnLimiter, turnConcurrencyLimiter, upload.single("audio"), async (req, res, next) => {
     const startedAt = Date.now();
     let streamStarted = false;
+    let webLease: WebTurnLease | null = null;
+    let usageReservation: string | null = null;
+    let abandonedUsage: Pick<WebTurnLease, "callId" | "usageTurnId" | "locale"> | null = null;
     const requestAbort = new AbortController();
     req.once("aborted", () => requestAbort.abort());
     res.once("close", () => {
@@ -539,6 +621,8 @@ export async function registerRoutes(
         history: parsedHistory,
         state: parsedState,
       });
+      assertValidUploadedAudio(req.file);
+      webLease = beginWebTurn(payload.callId, payload.locale, payload.turnId);
 
       await assertUsageAvailable();
 
@@ -561,7 +645,15 @@ export async function registerRoutes(
         });
       }
 
-      const state = updateCallState(transcript, payload.state, payload.locale);
+      const inputSeconds = req.file ? wavDurationSeconds(req.file.buffer) : estimateSpeechSeconds(transcript);
+      usageReservation = await reserveUsage(inputSeconds);
+      abandonedUsage = {
+        callId: webLease.callId,
+        usageTurnId: webLease.usageTurnId,
+        locale: webLease.locale,
+      };
+
+      const state = updateCallState(transcript, webLease.state, webLease.locale);
       const mode = currentMode(demo, fishEnabled);
       res.status(200);
       res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
@@ -653,7 +745,7 @@ export async function registerRoutes(
 
           for await (const delta of streamClaudeReply(
             transcript,
-            payload.history,
+            webLease.history,
             state,
             leadIn,
             payload.locale,
@@ -688,7 +780,7 @@ export async function registerRoutes(
           closeFish?.();
           providerFailure("live turn", error, claudeEnabled ? "anthropic" : "openai");
           audioWarning = fallbackWarnings[payload.locale].brain;
-          const fallback = demoReply(transcript, payload.history, state, payload.locale);
+          const fallback = demoReply(transcript, webLease.history, state, payload.locale);
           if (!reply.trim()) {
             reply = fallback;
             writeStreamEvent(res, { type: "text_delta", text: fallback });
@@ -709,8 +801,8 @@ export async function registerRoutes(
         }
       } else {
         reply = !demo && openai
-          ? await generateOpenAIReply(openai, transcript, payload.history, state, payload.locale, requestAbort.signal)
-          : demoReply(transcript, payload.history, state, payload.locale);
+          ? await generateOpenAIReply(openai, transcript, webLease.history, state, payload.locale, requestAbort.signal)
+          : demoReply(transcript, webLease.history, state, payload.locale);
         writeStreamEvent(res, { type: "text_delta", text: reply });
         if (fishEnabled) {
           try {
@@ -724,15 +816,15 @@ export async function registerRoutes(
         }
       }
 
-      if (payload.storageConsent && state.completed && !payload.state?.completed) {
+      if (payload.storageConsent && state.completed && !webLease.state.completed) {
         const result = await recordCompletedCall({
-          callId: payload.callId || randomUUID(),
+          callId: webLease.callId,
           source: "web",
           locale: payload.locale,
           state,
           transcript,
           history: [
-            ...payload.history,
+            ...webLease.history,
             { role: "user", content: transcript },
             { role: "assistant", content: reply.trim() },
           ],
@@ -740,16 +832,21 @@ export async function registerRoutes(
         recorded = result.saved;
       }
 
-
+      const { callId, usageTurnId } = webLease;
+      commitWebTurn(webLease, state, transcript, reply.trim());
+      webLease = null;
       const usage = await recordUsage({
-        turnId: payload.turnId,
-        callId: payload.callId || randomUUID(),
+        turnId: usageTurnId,
+        callId,
         source: "web",
         locale: payload.locale,
         inputSeconds: req.file ? wavDurationSeconds(req.file.buffer) : undefined,
         inputText: req.file ? undefined : transcript,
         reply,
+        reservationId: usageReservation,
       });
+      usageReservation = null;
+      abandonedUsage = null;
 
       writeStreamEvent(res, {
         type: "done",
@@ -765,14 +862,33 @@ export async function registerRoutes(
       if (!streamStarted) return next(error);
       writeStreamEvent(res, {
         type: "error",
-        message: error instanceof Error ? error.message : "Beklenmeyen streaming hatası.",
+        message: publicStreamErrorMessage(error),
       });
       return res.end();
+    } finally {
+      abortWebTurn(webLease);
+      if (usageReservation && abandonedUsage) {
+        await recordAbandonedUsage({
+          turnId: abandonedUsage.usageTurnId,
+          callId: abandonedUsage.callId,
+          source: "web",
+          locale: abandonedUsage.locale,
+          reservationId: usageReservation,
+        }).catch((error) => console.error(JSON.stringify({
+          level: "error",
+          event: "abandoned_usage_record_failed",
+          message: error instanceof Error ? error.message : "Abandoned usage record failed",
+        })));
+      }
+      releaseUsageReservation(usageReservation);
     }
   });
 
-  app.post("/api/turn", turnLimiter, upload.single("audio"), async (req, res, next) => {
+  app.post("/api/turn", turnLimiter, turnConcurrencyLimiter, upload.single("audio"), async (req, res, next) => {
     const startedAt = Date.now();
+    let webLease: WebTurnLease | null = null;
+    let usageReservation: string | null = null;
+    let abandonedUsage: Pick<WebTurnLease, "callId" | "usageTurnId" | "locale"> | null = null;
     const requestAbort = new AbortController();
     req.once("aborted", () => requestAbort.abort());
     res.once("close", () => {
@@ -791,6 +907,8 @@ export async function registerRoutes(
         history: parsedHistory,
         state: parsedState,
       });
+      assertValidUploadedAudio(req.file);
+      webLease = beginWebTurn(payload.callId, payload.locale, payload.turnId);
 
       await assertUsageAvailable();
 
@@ -812,20 +930,27 @@ export async function registerRoutes(
           message: payload.locale === "tr" ? "Konuşma veya metin bulunamadı." : "No speech or text was provided.",
         });
       }
-      const state = updateCallState(transcript, payload.state, payload.locale);
+      const inputSeconds = req.file ? wavDurationSeconds(req.file.buffer) : estimateSpeechSeconds(transcript);
+      usageReservation = await reserveUsage(inputSeconds);
+      abandonedUsage = {
+        callId: webLease.callId,
+        usageTurnId: webLease.usageTurnId,
+        locale: webLease.locale,
+      };
+      const state = updateCallState(transcript, webLease.state, webLease.locale);
 
       let reply = "";
       let providerWarning: string | null = null;
       try {
         reply = !demo && claudeEnabled
-          ? await generateClaudeReply(transcript, payload.history, state, payload.locale, requestAbort.signal)
+          ? await generateClaudeReply(transcript, webLease.history, state, payload.locale, requestAbort.signal)
           : !demo && openai
-            ? await generateOpenAIReply(openai, transcript, payload.history, state, payload.locale, requestAbort.signal)
-            : demoReply(transcript, payload.history, state, payload.locale);
+            ? await generateOpenAIReply(openai, transcript, webLease.history, state, payload.locale, requestAbort.signal)
+            : demoReply(transcript, webLease.history, state, payload.locale);
       } catch (error) {
         providerFailure("live turn", error, claudeEnabled ? "anthropic" : "openai");
         providerWarning = fallbackWarnings[payload.locale].brain;
-        reply = demoReply(transcript, payload.history, state, payload.locale);
+        reply = demoReply(transcript, webLease.history, state, payload.locale);
       }
 
       let audioBase64: string | null = null;
@@ -841,15 +966,15 @@ export async function registerRoutes(
       }
 
       let recorded = false;
-      if (payload.storageConsent && state.completed && !payload.state?.completed) {
+      if (payload.storageConsent && state.completed && !webLease.state.completed) {
         const result = await recordCompletedCall({
-          callId: payload.callId || randomUUID(),
+          callId: webLease.callId,
           source: "web",
           locale: payload.locale,
           state,
           transcript,
           history: [
-            ...payload.history,
+            ...webLease.history,
             { role: "user", content: transcript },
             { role: "assistant", content: reply.trim() },
           ],
@@ -857,16 +982,21 @@ export async function registerRoutes(
         recorded = result.saved;
       }
 
-
+      const { callId, usageTurnId } = webLease;
+      commitWebTurn(webLease, state, transcript, reply.trim());
+      webLease = null;
       const usage = await recordUsage({
-        turnId: payload.turnId,
-        callId: payload.callId || randomUUID(),
+        turnId: usageTurnId,
+        callId,
         source: "web",
         locale: payload.locale,
         inputSeconds: req.file ? wavDurationSeconds(req.file.buffer) : undefined,
         inputText: req.file ? undefined : transcript,
         reply,
+        reservationId: usageReservation,
       });
+      usageReservation = null;
+      abandonedUsage = null;
 
       return res.json({
         transcript,
@@ -882,6 +1012,22 @@ export async function registerRoutes(
       });
     } catch (error) {
       next(error);
+    } finally {
+      abortWebTurn(webLease);
+      if (usageReservation && abandonedUsage) {
+        await recordAbandonedUsage({
+          turnId: abandonedUsage.usageTurnId,
+          callId: abandonedUsage.callId,
+          source: "web",
+          locale: abandonedUsage.locale,
+          reservationId: usageReservation,
+        }).catch((error) => console.error(JSON.stringify({
+          level: "error",
+          event: "abandoned_usage_record_failed",
+          message: error instanceof Error ? error.message : "Abandoned usage record failed",
+        })));
+      }
+      releaseUsageReservation(usageReservation);
     }
   });
 

@@ -1,11 +1,13 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity, ArrowRight, AudioLines, BadgeDollarSign, Bot, CalendarClock, Check,
   CircleStop, Download, Headphones, Mic, MonitorPlay, Moon,
   PhoneCall, Radio, RefreshCw, RotateCcw, Send, ShieldCheck, Sun, UserRound,
   Waves, Wrench, BarChart3, LockKeyhole, Trash2,
+  PlugZap, PhoneOutgoing, CreditCard,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { CallState } from "@shared/schema";
 import { localeMetadata, normalizeLocale, supportedLocales, type Locale } from "@shared/i18n";
 import {
@@ -17,6 +19,7 @@ import {
   type Message,
   type PresentationScenario,
 } from "./i18n";
+import { apiRequest, queryClient } from "./lib/queryClient";
 
 type Status = {
   mode: "demo" | "fish-live" | "live";
@@ -70,44 +73,115 @@ type AdminRecord = {
   source: string;
   locale: string;
 };
+type IntegrationStatus = {
+  id: string;
+  label: string;
+  category: "voice" | "calendar" | "crm" | "billing";
+  configured: boolean;
+  missing: string[];
+  detail: string;
+};
 
 function AdminDashboard({ product }: { product: ProductConfig }) {
   const [key, setKey] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
-  const [records, setRecords] = useState<AdminRecord[]>([]);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [outboundNumber, setOutboundNumber] = useState("");
+  const [outboundLocale, setOutboundLocale] = useState<Locale>("en");
+  const [billingEmail, setBillingEmail] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+
+  const adminHeaders = () => ({ authorization: `Bearer ${key.trim()}` });
+  const usageQuery = useQuery<UsageSummary>({
+    queryKey: ["admin", "usage", period],
+    enabled: false,
+    gcTime: 0,
+    queryFn: async () => (await apiRequest("GET", `/api/admin/usage?period=${encodeURIComponent(period)}`, undefined, adminHeaders())).json(),
+  });
+  const recordsQuery = useQuery<{ records: AdminRecord[] }>({
+    queryKey: ["admin", "records"],
+    enabled: false,
+    gcTime: 0,
+    queryFn: async () => (await apiRequest("GET", "/api/admin/records?limit=50", undefined, adminHeaders())).json(),
+  });
+  const integrationsQuery = useQuery<{ integrations: IntegrationStatus[] }>({
+    queryKey: ["admin", "integrations"],
+    enabled: false,
+    gcTime: 0,
+    queryFn: async () => (await apiRequest("GET", "/api/admin/integrations", undefined, adminHeaders())).json(),
+  });
+
+  useEffect(() => () => {
+    queryClient.removeQueries({ queryKey: ["admin"] });
+  }, []);
+
+  function clearAdminSession() {
+    setAuthenticated(false);
+    queryClient.removeQueries({ queryKey: ["admin"] });
+  }
+
+  function changeAdminKey(value: string) {
+    if (value !== key) clearAdminSession();
+    setKey(value);
+  }
+
+  function logoutAdmin() {
+    setKey("");
+    setError("");
+    setActionMessage("");
+    clearAdminSession();
+  }
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/records/${id}`, undefined, adminHeaders()),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "records"] });
+      await recordsQuery.refetch();
+    },
+    onError: () => setError("Kayıt silinemedi."),
+  });
+  const outboundMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/admin/telephony/outbound", {
+      to: outboundNumber, locale: outboundLocale,
+    }, adminHeaders())).json() as Promise<{ sid: string; status: string; to: string }>,
+    onSuccess: (result) => {
+      setActionMessage(`Arama sıraya alındı: ${result.to} · ${result.status}`);
+      setOutboundNumber("");
+    },
+    onError: (reason) => setError(reason instanceof Error ? reason.message : "Arama başlatılamadı."),
+  });
+  const checkoutMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/admin/billing/checkout", {
+      email: billingEmail,
+    }, adminHeaders())).json() as Promise<{ id: string; url: string }>,
+    onSuccess: (result) => {
+      setActionMessage("Stripe ödeme sayfası oluşturuldu.");
+      window.location.assign(result.url);
+    },
+    onError: (reason) => setError(reason instanceof Error ? reason.message : "Ödeme bağlantısı oluşturulamadı."),
+  });
 
   async function loadDashboard(event?: FormEvent) {
     event?.preventDefault();
     if (!key.trim()) return;
-    setLoading(true);
     setError("");
+    setActionMessage("");
     try {
-      const headers = { authorization: `Bearer ${key.trim()}` };
-      const [usageResponse, recordsResponse] = await Promise.all([
-        fetch(`/api/admin/usage?period=${encodeURIComponent(period)}`, { headers }),
-        fetch("/api/admin/records?limit=50", { headers }),
-      ]);
-      if (!usageResponse.ok || !recordsResponse.ok) throw new Error("Yönetim anahtarı geçersiz veya servis hazır değil.");
-      setUsage(await usageResponse.json());
-      setRecords((await recordsResponse.json()).records || []);
+      const results = await Promise.all([usageQuery.refetch(), recordsQuery.refetch(), integrationsQuery.refetch()]);
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+      setAuthenticated(true);
     } catch (reason) {
+      clearAdminSession();
       setError(reason instanceof Error ? reason.message : "Yönetim verisi alınamadı.");
-    } finally {
-      setLoading(false);
     }
   }
 
-  async function removeRecord(id: string) {
-    const response = await fetch(`/api/admin/records/${id}`, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${key.trim()}` },
-    });
-    if (response.ok) setRecords((current) => current.filter((record) => record.id !== id));
-    else setError("Kayıt silinemedi.");
-  }
+  const usage = authenticated ? usageQuery.data || null : null;
+  const records = authenticated ? recordsQuery.data?.records || [] : [];
+  const integrations = authenticated ? integrationsQuery.data?.integrations || [] : [];
+  const loading = usageQuery.isFetching || recordsQuery.isFetching || integrationsQuery.isFetching;
 
   return <main className="admin-shell">
     <header className="admin-header">
@@ -116,12 +190,14 @@ function AdminDashboard({ product }: { product: ProductConfig }) {
       <Link href="/" className="admin-back">Canlı konsola dön</Link>
     </header>
     <form className="admin-login" onSubmit={loadDashboard}>
-      <LockKeyhole size={19} /><input type="password" value={key} onChange={(event) => setKey(event.target.value)}
-        placeholder="ADMIN_API_KEY" autoComplete="current-password" />
-      <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} />
-      <button type="submit" disabled={loading || !key.trim()}>{loading ? "Yükleniyor…" : "Raporu aç"}</button>
+      <LockKeyhole size={19} /><input type="password" value={key} onChange={(event) => changeAdminKey(event.target.value)}
+        placeholder="ADMIN_API_KEY" autoComplete="current-password" data-testid="input-admin-key" />
+      <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} data-testid="input-report-period" />
+      <button type="submit" disabled={loading || !key.trim()} data-testid="button-load-admin">{loading ? "Yükleniyor…" : "Raporu aç"}</button>
+      {authenticated && <button type="button" onClick={logoutAdmin} data-testid="button-admin-logout">Çıkış</button>}
     </form>
     {error && <p className="error-message" role="alert">{error}</p>}
+    {actionMessage && <p className="admin-success" role="status" data-testid="status-admin-action">{actionMessage}</p>}
     {usage && <>
       <section className="admin-metrics" aria-label="Kullanım özeti">
         <article><BarChart3 /><span>Aktif kullanım</span><strong>{usage.activeMinutes} dk</strong><small>{usage.remainingIncludedMinutes} dk paket kaldı</small></article>
@@ -134,8 +210,39 @@ function AdminDashboard({ product }: { product: ProductConfig }) {
           {records.length === 0 ? <p>Bu dönemde izinli kayıt bulunmuyor.</p> : records.map((record) => <article key={record.id}>
             <div><strong>{record.name || "İsimsiz müşteri"}</strong><small>{record.phone || "Telefon yok"} · {record.intent} · {record.locale.toUpperCase()}</small></div>
             <p>{record.summary}</p><time>{new Date(record.createdAt).toLocaleString("tr-TR")}</time>
-            <button type="button" aria-label="Kaydı sil" onClick={() => void removeRecord(record.id)}><Trash2 size={16} /></button>
+            <button type="button" aria-label="Kaydı sil" data-testid={`button-delete-record-${record.id}`}
+              onClick={() => removeMutation.mutate(record.id)}><Trash2 size={16} /></button>
           </article>)}
+        </div>
+      </section>
+      <section className="admin-integrations" aria-labelledby="integrations-title">
+        <div className="panel-title"><div><p className="eyebrow">PROVIDER CONNECTIONS</p>
+          <h2 id="integrations-title">Satış altyapısı</h2></div><PlugZap size={19} /></div>
+        <div className="integration-grid">
+          {integrations.map((item) => <article key={item.id} data-testid={`card-integration-${item.id}`}>
+            <div><strong>{item.label}</strong><span className={item.configured ? "ready" : "waiting"}>
+              {item.configured ? "Hazır" : "Kurulum gerekli"}</span></div>
+            <p>{item.detail}</p>
+            {!item.configured && <small>{item.missing.join(" · ")}</small>}
+          </article>)}
+        </div>
+        <div className="integration-actions">
+          <form onSubmit={(event) => { event.preventDefault(); setError(""); outboundMutation.mutate(); }}>
+            <div className="action-heading"><PhoneOutgoing size={18} /><div><strong>Test araması başlat</strong><small>E.164 numarası kullanın</small></div></div>
+            <label><span>Telefon</span><input type="tel" value={outboundNumber} onChange={(event) => setOutboundNumber(event.target.value)}
+              placeholder="+905551112233" data-testid="input-outbound-phone" required /></label>
+            <label><span>Dil</span><select value={outboundLocale} onChange={(event) => setOutboundLocale(event.target.value as Locale)}
+              data-testid="select-outbound-language">{supportedLocales.map((option) => <option key={option} value={option}>{localeMetadata[option].label}</option>)}</select></label>
+            <button type="submit" disabled={outboundMutation.isPending || !outboundNumber.trim()} data-testid="button-outbound-call">
+              {outboundMutation.isPending ? "Bağlanıyor…" : "Aramayı başlat"}</button>
+          </form>
+          <form onSubmit={(event) => { event.preventDefault(); setError(""); checkoutMutation.mutate(); }}>
+            <div className="action-heading"><CreditCard size={18} /><div><strong>Abonelik bağlantısı</strong><small>Stripe Checkout</small></div></div>
+            <label><span>Müşteri e-postası</span><input type="email" value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)}
+              placeholder="customer@company.com" data-testid="input-billing-email" required /></label>
+            <button type="submit" disabled={checkoutMutation.isPending || !billingEmail.trim()} data-testid="button-create-checkout">
+              {checkoutMutation.isPending ? "Oluşturuluyor…" : "Ödeme sayfası oluştur"}</button>
+          </form>
         </div>
       </section>
     </>}
@@ -385,27 +492,27 @@ export default function App() {
   const lastVoiceAtRef = useRef(0);
   const maxRecordingTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    refreshStatus();
-    fetch("/api/product").then((response) => response.json()).then((config: ProductConfig) => {
-      setProduct(config);
-      setMessages((current) => current.length === 1 ? initialMessages(locale, config.agentName) : current);
-      document.title = `${config.productName} — Multilingual Voice AI`;
-    }).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.lang = localeMetadata[locale].html;
-    window.localStorage.setItem("voiceops-studio-locale", locale);
-  }, [locale]);
-
-  function refreshStatus() {
+  const refreshStatus = useCallback(() => {
     fetch("/api/status").then((response) => response.json()).then(setStatus)
       .catch(() => {
         if (presentationMode) setUsingFallback(true);
         else setError(t.serverUnavailable);
       });
-  }
+  }, [presentationMode, t.serverUnavailable]);
+
+  useEffect(() => {
+    void refreshStatus();
+    fetch("/api/product").then((response) => response.json()).then((config: ProductConfig) => {
+      setProduct(config);
+      setMessages((current) => current.length === 1 ? initialMessages(locale, config.agentName) : current);
+      document.title = `${config.productName} — Multilingual Voice AI`;
+    }).catch(() => undefined);
+  }, [locale, refreshStatus]);
+
+  useEffect(() => {
+    document.documentElement.lang = localeMetadata[locale].html;
+    window.localStorage.setItem("voiceops-studio-locale", locale);
+  }, [locale]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);

@@ -10,7 +10,13 @@ test("tamamlanan çağrıyı şifreli ve tekil olarak kaydeder", async () => {
   delete process.env.CRM_WEBHOOK_URL;
   delete process.env.RECORD_STORAGE;
 
-  const { deleteCallRecord, listCallRecords, recordCompletedCall, recordsStatus } = await import("../server/records");
+  const {
+    deleteCallRecord,
+    listCallRecords,
+    recordCompletedCall,
+    recordsStatus,
+    resetRecordIdempotencyForTests,
+  } = await import("../server/records");
   const state = {
     intent: "fiyat" as const,
     name: "Ayşe Yılmaz",
@@ -37,14 +43,40 @@ test("tamamlanan çağrıyı şifreli ve tekil olarak kaydeder", async () => {
     transcript: "tekrar",
     history: [],
   });
+  resetRecordIdempotencyForTests();
+  const duplicateAfterRestart = await recordCompletedCall({
+    callId: "test-call-1",
+    source: "web",
+    locale: "tr",
+    state,
+    transcript: "yeniden başlatma sonrası tekrar",
+    history: [],
+  });
   const records = await listCallRecords();
 
   assert.equal(recordsStatus().encrypted, true);
   assert.equal(first.saved, true);
   assert.equal(duplicate.saved, false);
+  assert.equal(duplicateAfterRestart.saved, false);
   assert.equal(records.length, 1);
   assert.equal(records[0].phone, "05321234567");
   assert.equal(records[0].locale, "tr");
   assert.equal(await deleteCallRecord(records[0].id), true);
   assert.deepEqual(await listCallRecords(), []);
+});
+
+test("bozuk retention ve yönetim limitleri güvenli varsayılana düşer veya reddedilir", async () => {
+  const previous = process.env.RECORD_RETENTION_DAYS;
+  try {
+    process.env.RECORD_RETENTION_DAYS = "not-a-number";
+    const { configuredRetentionDays, parseRecordLimit } = await import("../server/records");
+    assert.equal(configuredRetentionDays(), 30);
+    assert.equal(parseRecordLimit("500"), 500);
+    assert.throws(() => parseRecordLimit("NaN"), /1 ile 500/i);
+    assert.throws(() => parseRecordLimit("501"), /1 ile 500/i);
+    assert.throws(() => parseRecordLimit(["10", "20"]), /1 ile 500/i);
+  } finally {
+    if (previous === undefined) delete process.env.RECORD_RETENTION_DAYS;
+    else process.env.RECORD_RETENTION_DAYS = previous;
+  }
 });

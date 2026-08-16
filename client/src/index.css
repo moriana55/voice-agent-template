@@ -375,7 +375,7 @@ body {
 .optional-consent a { color:var(--accent-dark); font-weight:700; }
 .admin-shell { width:min(1180px,calc(100% - 32px)); margin:0 auto; padding:48px 0 80px; }
 .admin-header { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-bottom:28px; border-bottom:1px solid var(--line); }
-.admin-header h1 { margin:4px 0 8px; font-size:clamp(2rem,5vw,4.5rem); letter-spacing:-.06em; }
+.admin-header h1 { margin:var(--space-1) 0 var(--space-2); font-size:var(--text-xl); letter-spacing:-.04em; }
 .admin-header p { color:var(--muted); }
 .admin-back { color:var(--ink); font-weight:700; text-decoration:none; border-bottom:1px solid var(--ink); }
 .admin-login { display:grid; grid-template-columns:auto minmax(220px,1fr) 180px auto; align-items:center; gap:12px; margin:28px 0; padding:16px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); }
@@ -387,6 +387,26 @@ body {
 .admin-metrics article span,.admin-metrics article small { color:var(--muted); }
 .admin-metrics article strong { font-size:2rem; }
 .admin-table-card { padding:24px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); }
+.admin-success { margin:var(--space-4) 0; padding:var(--space-3) var(--space-4); color:var(--success); background:color-mix(in srgb,var(--success) 10%,var(--surface)); border:1px solid color-mix(in srgb,var(--success) 28%,var(--line)); border-radius:var(--radius-md); }
+.admin-integrations { margin-top:var(--space-5); padding:var(--space-6); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); }
+.integration-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); }
+.integration-grid article { min-height:132px; display:flex; flex-direction:column; gap:var(--space-3); padding:var(--space-4); background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-md); }
+.integration-grid article > div { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); }
+.integration-grid p { margin:0; color:var(--muted); font-size:var(--text-sm); }
+.integration-grid small { margin-top:auto; color:var(--danger); overflow-wrap:anywhere; }
+.integration-grid .ready,.integration-grid .waiting { flex:0 0 auto; display:inline-flex; align-items:center; min-height:28px; padding:0 var(--space-2); border-radius:var(--radius-md); font-size:var(--text-xs); font-weight:700; }
+.integration-grid .ready { color:var(--success); background:color-mix(in srgb,var(--success) 10%,transparent); }
+.integration-grid .waiting { color:var(--muted); background:var(--surface-strong); }
+.integration-actions { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); margin-top:var(--space-5); }
+.integration-actions form { display:grid; grid-template-columns:1fr auto; align-items:end; gap:var(--space-3); padding:var(--space-4); background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-md); }
+.integration-actions form:first-child { grid-template-columns:minmax(180px,1fr) minmax(130px,.55fr) auto; }
+.action-heading { grid-column:1/-1; display:flex; align-items:center; gap:var(--space-3); }
+.action-heading strong,.action-heading small { display:block; }
+.action-heading small { margin-top:var(--space-1); color:var(--muted); }
+.integration-actions label { display:grid; gap:var(--space-2); color:var(--muted); font-size:var(--text-xs); }
+.integration-actions input,.integration-actions select,.integration-actions button { min-height:46px; padding:0 var(--space-3); border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); color:var(--ink); }
+.integration-actions button { background:var(--ink); color:var(--surface); font-weight:700; cursor:pointer; }
+.integration-actions button:disabled { cursor:not-allowed; opacity:.5; }
 .privacy-copy { max-width:820px; margin:32px 0; }
 .privacy-copy h2 { margin:28px 0 8px; font-size:1.2rem; }
 .privacy-copy h2:first-child { margin-top:0; }
@@ -404,6 +424,9 @@ body {
   .admin-metrics { grid-template-columns:1fr; }
   .admin-records article { grid-template-columns:1fr auto; }
   .admin-records article p,.admin-records article time { grid-column:1; }
+  .integration-grid,.integration-actions { grid-template-columns:1fr; }
+  .integration-actions form,.integration-actions form:first-child { grid-template-columns:1fr; }
+  .action-heading { grid-column:1; }
 }
 .connections,.transcript,.call-record { padding:var(--space-6); background:var(--surface); }
 .panel-title { padding-bottom:var(--space-4); }
