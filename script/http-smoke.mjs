@@ -59,6 +59,15 @@ const usagePayload = await usage.json();
 assert(usage.status === 200, `admin usage ${usage.status}`);
 assert(usagePayload.turns >= 1, "usage meter did not record the web turn");
 
+const operationalReadiness = await fetch(`${baseUrl}/api/admin/readiness`, {
+  headers: { authorization: `Bearer ${adminKey}` },
+});
+const operationalPayload = await operationalReadiness.json();
+assert([200, 503].includes(operationalReadiness.status), `admin readiness ${operationalReadiness.status}`);
+assert(typeof operationalPayload.ready === "boolean", "admin readiness boolean missing");
+assert(typeof operationalPayload.commercial?.enabled === "boolean", "commercial gate detail missing");
+assert(Array.isArray(operationalPayload.deploymentIssues), "deployment safety details missing");
+
 const phoneCallSid = `CA-${crypto.randomUUID()}`;
 const incomingUrl = `${baseUrl}/api/telephony/incoming?locale=tr`;
 const twilioBody = new URLSearchParams({ CallSid: phoneCallSid });
@@ -128,5 +137,5 @@ assert(
 
 console.log(JSON.stringify({
   ok: true,
-  checks: ["live", "ready", "product-config", "locale", "notice", "storage-consent", "turn", "record", "usage", "admin-auth", "twilio-signature", "twiml", "phone-turns"],
+  checks: ["live", "ready", "admin-readiness", "product-config", "locale", "notice", "storage-consent", "turn", "record", "usage", "admin-auth", "twilio-signature", "twiml", "phone-turns"],
 }));

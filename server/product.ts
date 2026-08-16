@@ -66,6 +66,7 @@ export function commercialReadiness() {
   const config = publicProductConfig();
   const issues: string[] = [];
   if (!process.env.PUBLIC_BUSINESS_NAME?.trim()) issues.push("PUBLIC_BUSINESS_NAME");
+  if (!/^[0-9a-f]{40}$/i.test(process.env.APP_REVISION?.trim() || "")) issues.push("APP_REVISION(40-char git SHA)");
   if (!process.env.BUSINESS_CONTEXT?.trim()) issues.push("BUSINESS_CONTEXT");
   if (!config.supportEmail) issues.push("PUBLIC_SUPPORT_EMAIL");
   if (!process.env.PUBLIC_PRIVACY_URL?.trim()) issues.push("PUBLIC_PRIVACY_URL");

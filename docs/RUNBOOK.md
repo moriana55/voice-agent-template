@@ -14,6 +14,7 @@ The production SLO, monitor, incident-routing, and privacy contract is documente
 - Public white-label config: `GET /api/product`
 - Protected usage report: `GET /api/admin/usage?period=YYYY-MM`
 - Protected integration readiness: `GET /api/admin/integrations`
+- Protected paid-customer readiness details: `GET /api/admin/readiness`
 - Protected outbound call: `POST /api/admin/telephony/outbound`
 - Protected subscription Checkout: `POST /api/admin/billing/checkout`
 - Stripe webhook: `POST /api/integrations/stripe/webhook`
@@ -49,6 +50,7 @@ The mode reflects runtime provider results after a request, not only whether a k
 11. Run `LOAD_BASE_URL=<isolated-demo-url> npm run smoke:load`; never set `LOAD_ALLOW_LIVE=true` without an explicit provider-cost budget.
 12. Confirm log ingestion and alert delivery in the target platform.
 13. Record the deployed git revision and the previous known-good artifact.
+14. Set `APP_REVISION` to that exact 40-character commit SHA and run the executable gate documented in [`CUSTOMER_ONBOARDING.md`](CUSTOMER_ONBOARDING.md). Do not route customer traffic unless its report has `passed: true`.
 
 ## Common incidents
 

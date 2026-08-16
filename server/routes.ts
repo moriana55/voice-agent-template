@@ -149,6 +149,36 @@ function currentMode(demo: boolean, fishConfigured: boolean) {
   return brainAvailable ? "live" : fishAvailable ? "fish-live" : "demo";
 }
 
+function runtimeReadiness() {
+  const fishConfigured = Boolean(process.env.FISH_AUDIO_API_KEY);
+  const fishAudio = providerAvailable("fishAudio", fishConfigured);
+  const brain = providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY))
+    || providerAvailable("openai", Boolean(process.env.OPENAI_API_KEY))
+    || process.env.DEMO_MODE !== "false";
+  const recordConfiguration = recordsStatus();
+  const privacyReady = !recordConfiguration.enabled || recordConfiguration.encrypted
+    || process.env.NODE_ENV !== "production";
+  const commercial = commercialReadiness();
+  const deploymentIssues = deploymentSafetyIssues();
+  const sessionConfiguration = webSessionStatus();
+  const ready = !isServerDraining()
+    && fishAudio && brain && privacyReady && commercial.ready && deploymentIssues.length === 0;
+  return {
+    ready,
+    revision: /^[0-9a-f]{40}$/i.test(process.env.APP_REVISION?.trim() || "")
+      ? process.env.APP_REVISION!.trim().toLowerCase()
+      : null,
+    mode: currentMode(isDemoBrain(), fishConfigured),
+    services: { fishAudio, brain },
+    privacyReady,
+    commercial,
+    deploymentIssues,
+    records: recordConfiguration,
+    sessions: sessionConfiguration,
+    telephonySessions: telephonySessionStatus(),
+  };
+}
+
 const fallbackWarnings: Record<Locale, { brain: string; voice: string }> = {
   en: { brain: "Live intelligence is unavailable; the secure local fallback is active.", voice: "Live voice is unavailable; browser audio is active." },
   tr: { brain: "Canlı zekâ servisine ulaşılamadı; güvenli yerel yedek devrede.", voice: "Canlı ses servisine ulaşılamadı; tarayıcı sesi devrede." },
@@ -492,27 +522,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/health/ready", (_req, res) => {
-    const fishAudio = providerAvailable("fishAudio", Boolean(process.env.FISH_AUDIO_API_KEY));
-    const brain = providerAvailable("anthropic", Boolean(process.env.ANTHROPIC_API_KEY))
-      || providerAvailable("openai", Boolean(process.env.OPENAI_API_KEY))
-      || process.env.DEMO_MODE !== "false";
-    const recordConfiguration = recordsStatus();
-    const privacyReady = !recordConfiguration.enabled || recordConfiguration.encrypted
-      || process.env.NODE_ENV !== "production";
-    const commercial = commercialReadiness();
-    const deploymentIssues = deploymentSafetyIssues();
-    const sessionConfiguration = webSessionStatus();
-    const ready = !isServerDraining()
-      && fishAudio && brain && privacyReady && commercial.ready && deploymentIssues.length === 0;
-    res.status(ready ? 200 : 503).json(publicReadinessPayload({
-      ready,
-      services: { fishAudio, brain },
-      privacyReady,
-      commercial,
-      deploymentIssues,
-      records: recordConfiguration,
-      sessions: sessionConfiguration,
-    }));
+    const readiness = runtimeReadiness();
+    res.status(readiness.ready ? 200 : 503).json(publicReadinessPayload(readiness));
   });
 
   app.get("/api/product", (_req, res) => {
@@ -531,6 +542,11 @@ export async function registerRoutes(
 
   app.get("/api/admin/integrations", requireAdmin, (_req, res) => {
     res.json({ integrations: integrationStatuses() });
+  });
+
+  app.get("/api/admin/readiness", requireAdmin, (_req, res) => {
+    const readiness = runtimeReadiness();
+    res.status(readiness.ready ? 200 : 503).json(readiness);
   });
 
   app.post("/api/admin/telephony/outbound", requireAdmin, async (req, res, next) => {

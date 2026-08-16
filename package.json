@@ -17,6 +17,7 @@
     "smoke:http": "node script/http-smoke.mjs",
     "smoke:load": "node script/load-smoke.mjs",
     "smoke:live": "node script/live-smoke.mjs",
+    "launch:gate": "node script/launch-gate.mjs",
     "backup": "node script/encrypted-backup.mjs"
   },
   "dependencies": {

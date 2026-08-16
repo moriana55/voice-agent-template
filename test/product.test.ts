@@ -11,6 +11,7 @@ import {
 test("müşteri modunda eksik ticari sırları ve sınırları hazır saymaz", () => {
   process.env.CUSTOMER_MODE = "true";
   process.env.PUBLIC_BUSINESS_NAME = "Test İşletmesi";
+  process.env.APP_REVISION = "a".repeat(40);
   process.env.BUSINESS_CONTEXT = "Doğrulanmış test işletmesi bilgisi";
   process.env.PUBLIC_SUPPORT_EMAIL = "destek@example.com";
   process.env.PUBLIC_PRIVACY_URL = "https://example.com/privacy";
@@ -31,6 +32,9 @@ test("müşteri modunda eksik ticari sırları ve sınırları hazır saymaz", (
   assert.ok(missingToken.issues.includes("CRM_WEBHOOK_TOKEN"));
 
   process.env.CRM_WEBHOOK_TOKEN = "crm-test-token";
+  delete process.env.APP_REVISION;
+  assert.ok(commercialReadiness().issues.includes("APP_REVISION(40-char git SHA)"));
+  process.env.APP_REVISION = "a".repeat(40);
   const ready = commercialReadiness();
   assert.equal(ready.ready, true);
   assert.deepEqual(ready.issues, []);
@@ -54,7 +58,7 @@ test("production readiness ayrıntıları public yanıtta gizlenir", () => {
 
 test("production canlı sağlayıcıları şifreleme, origin ve pozitif kota olmadan başlamaz", () => {
   const names = [
-    "NODE_ENV", "CUSTOMER_MODE", "FISH_AUDIO_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+    "NODE_ENV", "CUSTOMER_MODE", "APP_REVISION", "FISH_AUDIO_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
     "RECORD_STORAGE", "DATA_ENCRYPTION_KEY", "USAGE_HARD_LIMIT_MINUTES", "ALLOWED_ORIGINS",
     "WEB_REPLICA_COUNT", "ADMIN_API_KEY", "CRM_WEBHOOK_URL", "CRM_WEBHOOK_TOKEN",
     "CALENDAR_WEBHOOK_URL", "CALENDAR_WEBHOOK_TOKEN",

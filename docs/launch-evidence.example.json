@@ -1,0 +1,32 @@
+{
+  "format": "voiceops-launch-evidence",
+  "version": 1,
+  "environment": {
+    "kind": "customer",
+    "name": "replace-with-customer-environment-name",
+    "origin": "https://replace-with-customer-origin.example.com",
+    "deployedRevision": "replace-with-reviewed-40-character-git-sha"
+  },
+  "approvals": {
+    "businessIdentity": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "operatingContext": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "privacyLegal": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "retention": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "usageCost": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "providerDataTerms": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "recovery": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "incidentOwnership": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" }
+  },
+  "technicalChecks": {
+    "browserFlow": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "restartResume": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "recordDeletion": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "quotaBoundary": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "liveProviderTurn": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "soldLocaleVoices": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "monitoringFailure": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "backupRestore": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" },
+    "rollback": { "status": "pending", "owner": "replace", "at": "replace", "evidenceRef": "replace" }
+  },
+  "requiredIntegrations": []
+}
