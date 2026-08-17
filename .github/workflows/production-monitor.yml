@@ -59,8 +59,16 @@ jobs:
           console.log(JSON.stringify({ ok: true, live, ready }));
           NODE
 
+      # Incident bookkeeping must never decide whether production is healthy.
+      # These steps talk to the GitHub API, which has its own outages: on
+      # 2026-08-17 the 17:39 and 18:04 runs both probed production
+      # successfully ({"ok":true,"live":200,"ready":200}) and were still
+      # reported as failures, because api.github.com answered the issue
+      # lookup with 503. That paged us about an app that was never down.
+      # The probe decides the verdict; bookkeeping is best effort.
       - name: Open deduplicated incident issue
         if: failure()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -72,6 +80,7 @@ jobs:
 
       - name: Close recovered health incident
         if: success()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -98,6 +107,7 @@ jobs:
 
       - name: Open deduplicated voice incident issue
         if: failure()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -109,6 +119,7 @@ jobs:
 
       - name: Close recovered voice incident
         if: success()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
